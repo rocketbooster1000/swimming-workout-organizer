@@ -353,7 +353,7 @@ function GroupRow({
 }: {
   group: SetGroup;
   unit: string;
-  section: Section;
+  
   onChangeGroup: (p: Partial<SetGroup>) => void;
   onRemove: () => void;
   onMove: (dir: -1 | 1) => void;
