@@ -1,9 +1,6 @@
-export type Section = "warmup" | "main" | "cooldown";
-
 export type WorkoutSet = {
   id: string;
   type?: "set";
-  section: Section;
   rounds: number;
   reps: number;
   distance: number;
@@ -17,7 +14,6 @@ export type WorkoutSet = {
 export type SetGroup = {
   id: string;
   type: "group";
-  section: Section;
   rounds: number;
   label?: string;
   children: SectionItem[];
