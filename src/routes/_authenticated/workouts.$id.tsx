@@ -412,7 +412,6 @@ function GroupRow({
               key={c.id}
               group={c}
               unit={unit}
-              section={section}
               onChangeGroup={(p) => onUpdateItem(c.id, p)}
               onRemove={() => onRemoveItem(c.id)}
               onMove={(dir) => onMoveItem(c.id, dir)}
