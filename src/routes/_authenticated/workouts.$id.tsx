@@ -452,13 +452,21 @@ function GroupRow({
               onMoveItem={onMoveItem}
               onAddChildSet={onAddChildSet}
               onAddChildGroup={onAddChildGroup}
+              onAddChildRest={onAddChildRest}
+            />
+          ) : isRest(c) ? (
+            <RestRow
+              key={c.id}
+              rest={c}
+              onChange={(p) => onUpdateItem(c.id, p)}
+              onRemove={() => onRemoveItem(c.id)}
+              onMove={(dir) => onMoveItem(c.id, dir)}
             />
           ) : (
             <SetRow
               key={c.id}
               set={c}
               unit={unit}
-              inGroup
               onChange={(p) => onUpdateItem(c.id, p)}
               onRemove={() => onRemoveItem(c.id)}
               onMove={(dir) => onMoveItem(c.id, dir)}
@@ -472,13 +480,22 @@ function GroupRow({
           <Button size="sm" variant="ghost" onClick={() => onAddChildGroup(group.id)}>
             <Layers className="mr-1 h-3.5 w-3.5" /> Sub-group
           </Button>
+          <Button size="sm" variant="ghost" onClick={() => onAddChildRest(group.id)}>
+            <Hourglass className="mr-1 h-3.5 w-3.5" /> Rest
+          </Button>
         </div>
       </div>
 
       <div className="mt-1 hidden text-xs font-medium text-deep print:block">
         {group.rounds} rounds of{group.label ? ` — ${group.label}` : ""}:{" "}
         {group.children
-          .map((c) => (isGroup(c) ? `[${c.rounds}× …]` : describeSet(c, { hideRounds: true })))
+          .map((c) =>
+            isGroup(c)
+              ? `[${c.rounds}× …]`
+              : isRest(c)
+                ? `rest ${c.seconds}s`
+                : describeSet(c),
+          )
           .join("; ")}
       </div>
     </div>
