@@ -342,7 +342,6 @@ function WorkoutBuilder() {
 function GroupRow({
   group,
   unit,
-  section,
   onChangeGroup,
   onRemove,
   onMove,
