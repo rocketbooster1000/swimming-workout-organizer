@@ -10,7 +10,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import {
-  SECTIONS,
   STROKES,
   describeSet,
   formatDuration,
@@ -25,7 +24,6 @@ import {
   setDistance,
   setSeconds,
   totals,
-  type Section,
   type SectionItem,
   type SetGroup,
   type Workout,
