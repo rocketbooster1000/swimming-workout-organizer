@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, GripVertical, Plus, Printer, Save, Trash2, Waves } from "lucide-react";
+import { ArrowLeft, GripVertical, Layers, Plus, Printer, Save, Trash2, Waves } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,12 +15,19 @@ import {
   describeSet,
   formatDuration,
   formatInterval,
+  isGroup,
+  itemDistance,
+  itemSeconds,
+  newChildSet,
+  newGroup,
   newSet,
   parseInterval,
   setDistance,
   setSeconds,
   totals,
   type Section,
+  type SectionItem,
+  type SetGroup,
   type Workout,
   type WorkoutSet,
 } from "@/lib/workout";
@@ -29,6 +36,19 @@ export const Route = createFileRoute("/_authenticated/workouts/$id")({
   head: () => ({ meta: [{ title: "Edit workout — Lanes" }] }),
   component: WorkoutBuilder,
 });
+
+function normalizeItems(raw: unknown): SectionItem[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((it: any) => {
+    if (it && it.type === "group") {
+      return {
+        ...it,
+        children: Array.isArray(it.children) ? it.children : [],
+      } as SetGroup;
+    }
+    return { ...it, type: "set" } as WorkoutSet;
+  });
+}
 
 function WorkoutBuilder() {
   const { id } = Route.useParams();
@@ -49,7 +69,7 @@ function WorkoutBuilder() {
 
   useEffect(() => {
     if (workout && !draft) {
-      setDraft({ ...workout, sets: Array.isArray(workout.sets) ? workout.sets : [] });
+      setDraft({ ...workout, sets: normalizeItems(workout.sets) });
     }
   }, [workout, draft]);
 
@@ -60,33 +80,96 @@ function WorkoutBuilder() {
     setDirty(true);
   }
 
-  function updateSet(setId: string, patch: Partial<WorkoutSet>) {
-    setDraft((d) => d && { ...d, sets: d.sets.map((s) => (s.id === setId ? { ...s, ...patch } : s)) });
+  function mutateItems(fn: (items: SectionItem[]) => SectionItem[]) {
+    setDraft((d) => d && { ...d, sets: fn(d.sets) });
     setDirty(true);
   }
 
-  function removeSet(setId: string) {
-    setDraft((d) => d && { ...d, sets: d.sets.filter((s) => s.id !== setId) });
-    setDirty(true);
+  function updateItem(itemId: string, patch: Partial<SectionItem>) {
+    mutateItems((items) =>
+      items.map((it) => (it.id === itemId ? ({ ...it, ...patch } as SectionItem) : it)),
+    );
+  }
+
+  function removeItem(itemId: string) {
+    mutateItems((items) => items.filter((it) => it.id !== itemId));
+  }
+
+  function moveItem(itemId: string, dir: -1 | 1, section: Section) {
+    mutateItems((items) => {
+      const sectionItems = items.filter((s) => s.section === section);
+      const idx = sectionItems.findIndex((s) => s.id === itemId);
+      const target = idx + dir;
+      if (idx < 0 || target < 0 || target >= sectionItems.length) return items;
+      [sectionItems[idx], sectionItems[target]] = [sectionItems[target], sectionItems[idx]];
+      // rebuild full items keeping other sections order
+      const others = items.filter((s) => s.section !== section);
+      // preserve placement by re-merging in original order grouped by section
+      const result: SectionItem[] = [];
+      let si = 0;
+      for (const it of items) {
+        if (it.section === section) {
+          result.push(sectionItems[si++]);
+        } else {
+          result.push(it);
+        }
+      }
+      return result;
+    });
   }
 
   function addSet(section: Section) {
-    setDraft((d) => d && { ...d, sets: [...d.sets, newSet(section)] });
-    setDirty(true);
+    mutateItems((items) => [...items, newSet(section)]);
   }
 
-  function moveSet(setId: string, dir: -1 | 1) {
-    setDraft((d) => {
-      if (!d) return d;
-      const idx = d.sets.findIndex((s) => s.id === setId);
-      if (idx < 0) return d;
-      const target = idx + dir;
-      if (target < 0 || target >= d.sets.length) return d;
-      const next = [...d.sets];
-      [next[idx], next[target]] = [next[target], next[idx]];
-      return { ...d, sets: next };
-    });
-    setDirty(true);
+  function addGroup(section: Section) {
+    mutateItems((items) => [...items, newGroup(section)]);
+  }
+
+  function updateChild(groupId: string, childId: string, patch: Partial<WorkoutSet>) {
+    mutateItems((items) =>
+      items.map((it) => {
+        if (it.id !== groupId || !isGroup(it)) return it;
+        return {
+          ...it,
+          children: it.children.map((c) => (c.id === childId ? { ...c, ...patch } : c)),
+        };
+      }),
+    );
+  }
+
+  function addChild(groupId: string, section: Section) {
+    mutateItems((items) =>
+      items.map((it) =>
+        it.id === groupId && isGroup(it)
+          ? { ...it, children: [...it.children, newChildSet(section)] }
+          : it,
+      ),
+    );
+  }
+
+  function removeChild(groupId: string, childId: string) {
+    mutateItems((items) =>
+      items.map((it) =>
+        it.id === groupId && isGroup(it)
+          ? { ...it, children: it.children.filter((c) => c.id !== childId) }
+          : it,
+      ),
+    );
+  }
+
+  function moveChild(groupId: string, childId: string, dir: -1 | 1) {
+    mutateItems((items) =>
+      items.map((it) => {
+        if (it.id !== groupId || !isGroup(it)) return it;
+        const idx = it.children.findIndex((c) => c.id === childId);
+        const target = idx + dir;
+        if (idx < 0 || target < 0 || target >= it.children.length) return it;
+        const next = [...it.children];
+        [next[idx], next[target]] = [next[target], next[idx]];
+        return { ...it, children: next };
+      }),
+    );
   }
 
   async function save() {
@@ -215,9 +298,9 @@ function WorkoutBuilder() {
       {/* Sections */}
       <div className="mt-6 space-y-6">
         {SECTIONS.map(({ key, label }) => {
-          const sectionSets = draft.sets.filter((s) => s.section === key);
-          const sd = sectionSets.reduce((a, s) => a + setDistance(s), 0);
-          const ss = sectionSets.reduce((a, s) => a + setSeconds(s), 0);
+          const sectionItems = draft.sets.filter((s) => s.section === key);
+          const sd = sectionItems.reduce((a, s) => a + itemDistance(s), 0);
+          const ss = sectionItems.reduce((a, s) => a + itemSeconds(s), 0);
           return (
             <section key={key} className={`section-${key} rounded-xl p-5`}>
               <div className="flex items-center justify-between">
@@ -227,27 +310,47 @@ function WorkoutBuilder() {
                     {sd.toLocaleString()} {draft.pool_unit} · {formatDuration(ss)}
                   </div>
                 </div>
-                <Button size="sm" variant="outline" onClick={() => addSet(key)} className="print:hidden">
-                  <Plus className="mr-1 h-3.5 w-3.5" /> Add set
-                </Button>
+                <div className="flex gap-2 print:hidden">
+                  <Button size="sm" variant="outline" onClick={() => addSet(key)}>
+                    <Plus className="mr-1 h-3.5 w-3.5" /> Set
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => addGroup(key)}>
+                    <Layers className="mr-1 h-3.5 w-3.5" /> Group
+                  </Button>
+                </div>
               </div>
 
               <div className="mt-4 space-y-3">
-                {sectionSets.length === 0 && (
+                {sectionItems.length === 0 && (
                   <div className="rounded-lg border border-dashed border-border/60 bg-card/50 p-6 text-center text-xs text-muted-foreground">
                     No sets yet — add a {label.toLowerCase()} block.
                   </div>
                 )}
-                {sectionSets.map((s) => (
-                  <SetRow
-                    key={s.id}
-                    set={s}
-                    unit={draft.pool_unit}
-                    onChange={(p) => updateSet(s.id, p)}
-                    onRemove={() => removeSet(s.id)}
-                    onMove={(dir) => moveSet(s.id, dir)}
-                  />
-                ))}
+                {sectionItems.map((item) =>
+                  isGroup(item) ? (
+                    <GroupRow
+                      key={item.id}
+                      group={item}
+                      unit={draft.pool_unit}
+                      onChangeGroup={(p) => updateItem(item.id, p)}
+                      onRemove={() => removeItem(item.id)}
+                      onMove={(dir) => moveItem(item.id, dir, key)}
+                      onChangeChild={(cid, p) => updateChild(item.id, cid, p)}
+                      onAddChild={() => addChild(item.id, key)}
+                      onRemoveChild={(cid) => removeChild(item.id, cid)}
+                      onMoveChild={(cid, dir) => moveChild(item.id, cid, dir)}
+                    />
+                  ) : (
+                    <SetRow
+                      key={item.id}
+                      set={item}
+                      unit={draft.pool_unit}
+                      onChange={(p) => updateItem(item.id, p)}
+                      onRemove={() => removeItem(item.id)}
+                      onMove={(dir) => moveItem(item.id, dir, key)}
+                    />
+                  ),
+                )}
               </div>
             </section>
           );
@@ -268,21 +371,115 @@ function WorkoutBuilder() {
   );
 }
 
+function GroupRow({
+  group,
+  unit,
+  onChangeGroup,
+  onRemove,
+  onMove,
+  onChangeChild,
+  onAddChild,
+  onRemoveChild,
+  onMoveChild,
+}: {
+  group: SetGroup;
+  unit: string;
+  onChangeGroup: (p: Partial<SetGroup>) => void;
+  onRemove: () => void;
+  onMove: (dir: -1 | 1) => void;
+  onChangeChild: (childId: string, p: Partial<WorkoutSet>) => void;
+  onAddChild: () => void;
+  onRemoveChild: (childId: string) => void;
+  onMoveChild: (childId: string, dir: -1 | 1) => void;
+}) {
+  const dist = itemDistance(group);
+  const secs = itemSeconds(group);
+  return (
+    <div className="rounded-lg border-2 border-primary/30 bg-foam/40 p-3">
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="flex flex-col items-center gap-1 print:hidden">
+          <button onClick={() => onMove(-1)} className="text-xs text-muted-foreground hover:text-deep">▲</button>
+          <Layers className="h-4 w-4 text-primary/70" />
+          <button onClick={() => onMove(1)} className="text-xs text-muted-foreground hover:text-deep">▼</button>
+        </div>
+        <Field label="Rounds" w="w-20">
+          <Input
+            type="number"
+            min={1}
+            value={group.rounds}
+            onChange={(e) => onChangeGroup({ rounds: parseInt(e.target.value) || 1 })}
+          />
+        </Field>
+        <span className="pb-2 text-muted-foreground">rounds of</span>
+        <Field label="Group label (optional)" w="flex-1 min-w-48">
+          <Input
+            value={group.label ?? ""}
+            onChange={(e) => onChangeGroup({ label: e.target.value })}
+            placeholder="e.g. Stroke rotation"
+          />
+        </Field>
+        <div className="ml-auto flex items-center gap-3">
+          <div className="text-right">
+            <div className="font-display text-base font-semibold tabular-nums text-deep">{dist.toLocaleString()} {unit}</div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{formatDuration(secs) || "—"}</div>
+          </div>
+          <Button size="icon" variant="ghost" onClick={onRemove} className="print:hidden">
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+
+      <div className="mt-3 ml-4 space-y-2 border-l-2 border-primary/30 pl-4">
+        {group.children.length === 0 && (
+          <div className="rounded border border-dashed border-border/60 p-3 text-center text-xs text-muted-foreground">
+            No sub-sets yet.
+          </div>
+        )}
+        {group.children.map((c) => (
+          <SetRow
+            key={c.id}
+            set={c}
+            unit={unit}
+            inGroup
+            onChange={(p) => onChangeChild(c.id, p)}
+            onRemove={() => onRemoveChild(c.id)}
+            onMove={(dir) => onMoveChild(c.id, dir)}
+          />
+        ))}
+        <Button size="sm" variant="ghost" onClick={onAddChild} className="print:hidden">
+          <Plus className="mr-1 h-3.5 w-3.5" /> Add sub-set
+        </Button>
+      </div>
+
+      <div className="mt-1 hidden text-xs font-medium text-deep print:block">
+        {group.rounds} rounds of{group.label ? ` — ${group.label}` : ""}:{" "}
+        {group.children.map((c) => describeSet(c, { hideRounds: true })).join("; ")}
+      </div>
+    </div>
+  );
+}
+
 function SetRow({
   set,
   unit,
+  inGroup,
   onChange,
   onRemove,
   onMove,
 }: {
   set: WorkoutSet;
   unit: string;
+  inGroup?: boolean;
   onChange: (p: Partial<WorkoutSet>) => void;
   onRemove: () => void;
   onMove: (dir: -1 | 1) => void;
 }) {
   const [intervalStr, setIntervalStr] = useState(formatInterval(set.interval_seconds));
   useEffect(() => setIntervalStr(formatInterval(set.interval_seconds)), [set.interval_seconds]);
+
+  const childReps = (set.reps || 1);
+  const childDist = childReps * (set.distance || 0);
+  const childSecs = childReps * (set.interval_seconds ?? 0) + (set.rest_seconds ?? 0);
 
   return (
     <div className="rounded-lg border border-border/60 bg-card/80 p-3">
@@ -292,10 +489,14 @@ function SetRow({
           <GripVertical className="h-4 w-4 text-muted-foreground/60" />
           <button onClick={() => onMove(1)} className="text-xs text-muted-foreground hover:text-deep">▼</button>
         </div>
-        <Field label="Rounds" w="w-16">
-          <Input type="number" min={1} value={set.rounds} onChange={(e) => onChange({ rounds: parseInt(e.target.value) || 1 })} />
-        </Field>
-        <span className="pb-2 text-muted-foreground">×</span>
+        {!inGroup && (
+          <>
+            <Field label="Rounds" w="w-16">
+              <Input type="number" min={1} value={set.rounds} onChange={(e) => onChange({ rounds: parseInt(e.target.value) || 1 })} />
+            </Field>
+            <span className="pb-2 text-muted-foreground">×</span>
+          </>
+        )}
         <Field label="Reps" w="w-16">
           <Input type="number" min={1} value={set.reps} onChange={(e) => onChange({ reps: parseInt(e.target.value) || 1 })} />
         </Field>
@@ -328,8 +529,12 @@ function SetRow({
         </Field>
         <div className="ml-auto flex items-center gap-3">
           <div className="text-right">
-            <div className="font-display text-base font-semibold tabular-nums text-deep">{setDistance(set).toLocaleString()} {unit}</div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{formatDuration(setSeconds(set)) || "—"}</div>
+            <div className="font-display text-base font-semibold tabular-nums text-deep">
+              {(inGroup ? childDist : setDistance(set)).toLocaleString()} {unit}
+            </div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              {formatDuration(inGroup ? childSecs : setSeconds(set)) || "—"}
+            </div>
           </div>
           <Button size="icon" variant="ghost" onClick={onRemove} className="print:hidden">
             <Trash2 className="h-3.5 w-3.5" />
@@ -350,7 +555,7 @@ function SetRow({
           className="h-8 w-56 text-xs"
         />
       </div>
-      <div className="mt-1 hidden text-xs font-medium text-deep print:block">{describeSet(set)}</div>
+      <div className="mt-1 hidden text-xs font-medium text-deep print:block">{describeSet(set, { hideRounds: inGroup })}</div>
     </div>
   );
 }

@@ -2,6 +2,7 @@ export type Section = "warmup" | "main" | "cooldown";
 
 export type WorkoutSet = {
   id: string;
+  type?: "set";
   section: Section;
   rounds: number;
   reps: number;
@@ -13,6 +14,21 @@ export type WorkoutSet = {
   equipment?: string;
 };
 
+export type SetGroup = {
+  id: string;
+  type: "group";
+  section: Section;
+  rounds: number;
+  label?: string;
+  children: WorkoutSet[];
+};
+
+export type SectionItem = WorkoutSet | SetGroup;
+
+export function isGroup(item: SectionItem): item is SetGroup {
+  return (item as SetGroup).type === "group";
+}
+
 export type Workout = {
   id: string;
   user_id: string;
@@ -22,7 +38,7 @@ export type Workout = {
   pool_length: number;
   pool_unit: string;
   notes: string | null;
-  sets: WorkoutSet[];
+  sets: SectionItem[];
   total_distance: number;
   total_seconds: number;
   scheduled_for: string | null;
@@ -59,11 +75,30 @@ export function setSeconds(s: WorkoutSet) {
   return reps * interval + (s.rounds || 1) * rest;
 }
 
-export function totals(sets: WorkoutSet[]) {
-  return sets.reduce(
+export function itemDistance(item: SectionItem): number {
+  if (isGroup(item)) {
+    const inner = item.children.reduce((a, c) => a + (c.reps || 1) * (c.distance || 0), 0);
+    return (item.rounds || 1) * inner;
+  }
+  return setDistance(item);
+}
+
+export function itemSeconds(item: SectionItem): number {
+  if (isGroup(item)) {
+    const inner = item.children.reduce((a, c) => {
+      const reps = c.reps || 1;
+      return a + reps * (c.interval_seconds ?? 0) + (c.rest_seconds ?? 0);
+    }, 0);
+    return (item.rounds || 1) * inner;
+  }
+  return setSeconds(item);
+}
+
+export function totals(items: SectionItem[]) {
+  return items.reduce(
     (acc, s) => {
-      acc.distance += setDistance(s);
-      acc.seconds += setSeconds(s);
+      acc.distance += itemDistance(s);
+      acc.seconds += itemSeconds(s);
       return acc;
     },
     { distance: 0, seconds: 0 },
@@ -98,8 +133,8 @@ export function parseInterval(value: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-export function describeSet(s: WorkoutSet) {
-  const rounds = s.rounds > 1 ? `${s.rounds} rounds of ` : "";
+export function describeSet(s: WorkoutSet, opts?: { hideRounds?: boolean }) {
+  const rounds = !opts?.hideRounds && s.rounds > 1 ? `${s.rounds} rounds of ` : "";
   const reps = `${s.reps} × ${s.distance}`;
   const stroke = s.stroke ? ` ${s.stroke}` : "";
   const interval = s.interval_seconds ? ` @ ${formatInterval(s.interval_seconds)}` : "";
@@ -109,6 +144,7 @@ export function describeSet(s: WorkoutSet) {
 export function newSet(section: Section): WorkoutSet {
   return {
     id: crypto.randomUUID(),
+    type: "set",
     section,
     rounds: 1,
     reps: 4,
@@ -118,5 +154,20 @@ export function newSet(section: Section): WorkoutSet {
     rest_seconds: null,
     description: "",
     equipment: "",
+  };
+}
+
+export function newChildSet(section: Section): WorkoutSet {
+  return { ...newSet(section), reps: 3, distance: 50 };
+}
+
+export function newGroup(section: Section): SetGroup {
+  return {
+    id: crypto.randomUUID(),
+    type: "group",
+    section,
+    rounds: 2,
+    label: "",
+    children: [newChildSet(section), newChildSet(section)],
   };
 }
