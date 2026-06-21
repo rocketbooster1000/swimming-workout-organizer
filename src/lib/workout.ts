@@ -54,10 +54,16 @@ export const STROKES = [
   "Pull",
 ];
 
-export const SECTIONS: { key: Section; label: string }[] = [
-  { key: "warmup", label: "Warm-up" },
-  { key: "main", label: "Main Set" },
-  { key: "cooldown", label: "Cool-down" },
+export const STROKES = [
+  "Freestyle",
+  "Backstroke",
+  "Breaststroke",
+  "Butterfly",
+  "IM",
+  "Choice",
+  "Kick",
+  "Drill",
+  "Pull",
 ];
 
 export function setDistance(s: WorkoutSet) {
