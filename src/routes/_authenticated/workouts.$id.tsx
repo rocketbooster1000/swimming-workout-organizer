@@ -124,29 +124,29 @@ function WorkoutBuilder() {
     mutateItems(walk);
   }
 
-  function addSet(section: Section) {
-    mutateItems((items) => [...items, newSet(section)]);
+  function addSet() {
+    mutateItems((items) => [...items, newSet()]);
   }
 
-  function addGroup(section: Section) {
-    mutateItems((items) => [...items, newGroup(section)]);
+  function addGroup() {
+    mutateItems((items) => [...items, newGroup()]);
   }
 
-  function addChildSet(groupId: string, section: Section) {
+  function addChildSet(groupId: string) {
     mutateItems((items) =>
       mapTree(items, (it) =>
         it.id === groupId && isGroup(it)
-          ? { ...it, children: [...it.children, newChildSet(section)] }
+          ? { ...it, children: [...it.children, newChildSet()] }
           : it,
       ),
     );
   }
 
-  function addChildGroup(groupId: string, section: Section) {
+  function addChildGroup(groupId: string) {
     mutateItems((items) =>
       mapTree(items, (it) =>
         it.id === groupId && isGroup(it)
-          ? { ...it, children: [...it.children, newGroup(section)] }
+          ? { ...it, children: [...it.children, newGroup()] }
           : it,
       ),
     );
