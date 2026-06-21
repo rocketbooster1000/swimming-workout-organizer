@@ -434,10 +434,10 @@ function GroupRow({
           ),
         )}
         <div className="flex gap-2 print:hidden">
-          <Button size="sm" variant="ghost" onClick={() => onAddChildSet(group.id, section)}>
+          <Button size="sm" variant="ghost" onClick={() => onAddChildSet(group.id)}>
             <Plus className="mr-1 h-3.5 w-3.5" /> Sub-set
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => onAddChildGroup(group.id, section)}>
+          <Button size="sm" variant="ghost" onClick={() => onAddChildGroup(group.id)}>
             <Layers className="mr-1 h-3.5 w-3.5" /> Sub-group
           </Button>
         </div>
