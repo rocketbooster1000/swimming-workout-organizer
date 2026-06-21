@@ -505,24 +505,18 @@ function GroupRow({
 function SetRow({
   set,
   unit,
-  inGroup,
   onChange,
   onRemove,
   onMove,
 }: {
   set: WorkoutSet;
   unit: string;
-  inGroup?: boolean;
   onChange: (p: Partial<WorkoutSet>) => void;
   onRemove: () => void;
   onMove: (dir: -1 | 1) => void;
 }) {
   const [intervalStr, setIntervalStr] = useState(formatInterval(set.interval_seconds));
   useEffect(() => setIntervalStr(formatInterval(set.interval_seconds)), [set.interval_seconds]);
-
-  const childReps = (set.reps || 1);
-  const childDist = childReps * (set.distance || 0);
-  const childSecs = childReps * (set.interval_seconds ?? 0) + (set.rest_seconds ?? 0);
 
   return (
     <div className="rounded-lg border border-border/60 bg-card/80 p-3">
@@ -532,17 +526,10 @@ function SetRow({
           <GripVertical className="h-4 w-4 text-muted-foreground/60" />
           <button onClick={() => onMove(1)} className="text-xs text-muted-foreground hover:text-deep">▼</button>
         </div>
-        {!inGroup && (
-          <>
-            <Field label="Rounds" w="w-16">
-              <Input type="number" min={1} value={set.rounds} onChange={(e) => onChange({ rounds: parseInt(e.target.value) || 1 })} />
-            </Field>
-            <span className="pb-2 text-muted-foreground">×</span>
-          </>
-        )}
         <Field label="Reps" w="w-16">
           <Input type="number" min={1} value={set.reps} onChange={(e) => onChange({ reps: parseInt(e.target.value) || 1 })} />
         </Field>
+        <span className="pb-2 text-muted-foreground">×</span>
         <Field label={`Dist (${unit})`} w="w-20">
           <Input type="number" min={0} step={25} value={set.distance} onChange={(e) => onChange({ distance: parseInt(e.target.value) || 0 })} />
         </Field>
@@ -562,21 +549,13 @@ function SetRow({
             onBlur={() => onChange({ interval_seconds: parseInterval(intervalStr) })}
           />
         </Field>
-        <Field label="Rest (s)" w="w-20">
-          <Input
-            type="number"
-            min={0}
-            value={set.rest_seconds ?? ""}
-            onChange={(e) => onChange({ rest_seconds: e.target.value ? parseInt(e.target.value) : null })}
-          />
-        </Field>
         <div className="ml-auto flex items-center gap-3">
           <div className="text-right">
             <div className="font-display text-base font-semibold tabular-nums text-deep">
-              {(inGroup ? childDist : setDistance(set)).toLocaleString()} {unit}
+              {setDistance(set).toLocaleString()} {unit}
             </div>
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-              {formatDuration(inGroup ? childSecs : setSeconds(set)) || "—"}
+              {formatDuration(setSeconds(set)) || "—"}
             </div>
           </div>
           <Button size="icon" variant="ghost" onClick={onRemove} className="print:hidden">
@@ -598,7 +577,58 @@ function SetRow({
           className="h-8 w-56 text-xs"
         />
       </div>
-      <div className="mt-1 hidden text-xs font-medium text-deep print:block">{describeSet(set, { hideRounds: inGroup })}</div>
+      <div className="mt-1 hidden text-xs font-medium text-deep print:block">{describeSet(set)}</div>
+    </div>
+  );
+}
+
+function RestRow({
+  rest,
+  onChange,
+  onRemove,
+  onMove,
+}: {
+  rest: RestItem;
+  onChange: (p: Partial<RestItem>) => void;
+  onRemove: () => void;
+  onMove: (dir: -1 | 1) => void;
+}) {
+  return (
+    <div className="rounded-lg border border-dashed border-primary/40 bg-foam/30 p-3">
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="flex flex-col items-center gap-1 print:hidden">
+          <button onClick={() => onMove(-1)} className="text-xs text-muted-foreground hover:text-deep">▲</button>
+          <Hourglass className="h-4 w-4 text-primary/70" />
+          <button onClick={() => onMove(1)} className="text-xs text-muted-foreground hover:text-deep">▼</button>
+        </div>
+        <Field label="Rest (s)" w="w-24">
+          <Input
+            type="number"
+            min={0}
+            value={rest.seconds}
+            onChange={(e) => onChange({ seconds: parseInt(e.target.value) || 0 })}
+          />
+        </Field>
+        <Field label="Note (optional)" w="flex-1 min-w-40">
+          <Input
+            value={rest.label ?? ""}
+            onChange={(e) => onChange({ label: e.target.value })}
+            placeholder="e.g. extra recovery, get water"
+          />
+        </Field>
+        <div className="ml-auto flex items-center gap-3">
+          <div className="text-right">
+            <div className="font-display text-base font-semibold tabular-nums text-deep">Rest</div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{formatDuration(rest.seconds) || "—"}</div>
+          </div>
+          <Button size="icon" variant="ghost" onClick={onRemove} className="print:hidden">
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+      <div className="mt-1 hidden text-xs font-medium text-deep print:block">
+        Rest {rest.seconds}s{rest.label ? ` — ${rest.label}` : ""}
+      </div>
     </div>
   );
 }
