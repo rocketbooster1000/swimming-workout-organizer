@@ -85,37 +85,45 @@ function WorkoutBuilder() {
     setDirty(true);
   }
 
+  // Recursive tree helpers — operate on any item by id, at any nesting depth.
+  function mapTree(items: SectionItem[], fn: (it: SectionItem) => SectionItem | null): SectionItem[] {
+    const out: SectionItem[] = [];
+    for (const it of items) {
+      const mapped = fn(it);
+      if (mapped === null) continue;
+      if (isGroup(mapped)) {
+        out.push({ ...mapped, children: mapTree(mapped.children, fn) });
+      } else {
+        out.push(mapped);
+      }
+    }
+    return out;
+  }
+
   function updateItem(itemId: string, patch: Partial<SectionItem>) {
     mutateItems((items) =>
-      items.map((it) => (it.id === itemId ? ({ ...it, ...patch } as SectionItem) : it)),
+      mapTree(items, (it) => (it.id === itemId ? ({ ...it, ...patch } as SectionItem) : it)),
     );
   }
 
   function removeItem(itemId: string) {
-    mutateItems((items) => items.filter((it) => it.id !== itemId));
+    mutateItems((items) => mapTree(items, (it) => (it.id === itemId ? null : it)));
   }
 
-  function moveItem(itemId: string, dir: -1 | 1, section: Section) {
-    mutateItems((items) => {
-      const sectionItems = items.filter((s) => s.section === section);
-      const idx = sectionItems.findIndex((s) => s.id === itemId);
-      const target = idx + dir;
-      if (idx < 0 || target < 0 || target >= sectionItems.length) return items;
-      [sectionItems[idx], sectionItems[target]] = [sectionItems[target], sectionItems[idx]];
-      // rebuild full items keeping other sections order
-      const others = items.filter((s) => s.section !== section);
-      // preserve placement by re-merging in original order grouped by section
-      const result: SectionItem[] = [];
-      let si = 0;
-      for (const it of items) {
-        if (it.section === section) {
-          result.push(sectionItems[si++]);
-        } else {
-          result.push(it);
-        }
+  // Move within whatever sibling list contains the item.
+  function moveItem(itemId: string, dir: -1 | 1) {
+    function walk(items: SectionItem[]): SectionItem[] {
+      const idx = items.findIndex((s) => s.id === itemId);
+      if (idx >= 0) {
+        const target = idx + dir;
+        if (target < 0 || target >= items.length) return items;
+        const next = [...items];
+        [next[idx], next[target]] = [next[target], next[idx]];
+        return next;
       }
-      return result;
-    });
+      return items.map((it) => (isGroup(it) ? { ...it, children: walk(it.children) } : it));
+    }
+    mutateItems(walk);
   }
 
   function addSet(section: Section) {
@@ -126,21 +134,9 @@ function WorkoutBuilder() {
     mutateItems((items) => [...items, newGroup(section)]);
   }
 
-  function updateChild(groupId: string, childId: string, patch: Partial<WorkoutSet>) {
+  function addChildSet(groupId: string, section: Section) {
     mutateItems((items) =>
-      items.map((it) => {
-        if (it.id !== groupId || !isGroup(it)) return it;
-        return {
-          ...it,
-          children: it.children.map((c) => (c.id === childId ? { ...c, ...patch } : c)),
-        };
-      }),
-    );
-  }
-
-  function addChild(groupId: string, section: Section) {
-    mutateItems((items) =>
-      items.map((it) =>
+      mapTree(items, (it) =>
         it.id === groupId && isGroup(it)
           ? { ...it, children: [...it.children, newChildSet(section)] }
           : it,
@@ -148,29 +144,16 @@ function WorkoutBuilder() {
     );
   }
 
-  function removeChild(groupId: string, childId: string) {
+  function addChildGroup(groupId: string, section: Section) {
     mutateItems((items) =>
-      items.map((it) =>
+      mapTree(items, (it) =>
         it.id === groupId && isGroup(it)
-          ? { ...it, children: it.children.filter((c) => c.id !== childId) }
+          ? { ...it, children: [...it.children, newGroup(section)] }
           : it,
       ),
     );
   }
 
-  function moveChild(groupId: string, childId: string, dir: -1 | 1) {
-    mutateItems((items) =>
-      items.map((it) => {
-        if (it.id !== groupId || !isGroup(it)) return it;
-        const idx = it.children.findIndex((c) => c.id === childId);
-        const target = idx + dir;
-        if (idx < 0 || target < 0 || target >= it.children.length) return it;
-        const next = [...it.children];
-        [next[idx], next[target]] = [next[target], next[idx]];
-        return { ...it, children: next };
-      }),
-    );
-  }
 
   async function save() {
     if (!draft) return;
@@ -332,13 +315,15 @@ function WorkoutBuilder() {
                       key={item.id}
                       group={item}
                       unit={draft.pool_unit}
+                      section={key}
                       onChangeGroup={(p) => updateItem(item.id, p)}
                       onRemove={() => removeItem(item.id)}
-                      onMove={(dir) => moveItem(item.id, dir, key)}
-                      onChangeChild={(cid, p) => updateChild(item.id, cid, p)}
-                      onAddChild={() => addChild(item.id, key)}
-                      onRemoveChild={(cid) => removeChild(item.id, cid)}
-                      onMoveChild={(cid, dir) => moveChild(item.id, cid, dir)}
+                      onMove={(dir) => moveItem(item.id, dir)}
+                      onUpdateItem={updateItem}
+                      onRemoveItem={removeItem}
+                      onMoveItem={moveItem}
+                      onAddChildSet={addChildSet}
+                      onAddChildGroup={addChildGroup}
                     />
                   ) : (
                     <SetRow
@@ -347,7 +332,7 @@ function WorkoutBuilder() {
                       unit={draft.pool_unit}
                       onChange={(p) => updateItem(item.id, p)}
                       onRemove={() => removeItem(item.id)}
-                      onMove={(dir) => moveItem(item.id, dir, key)}
+                      onMove={(dir) => moveItem(item.id, dir)}
                     />
                   ),
                 )}
@@ -374,23 +359,27 @@ function WorkoutBuilder() {
 function GroupRow({
   group,
   unit,
+  section,
   onChangeGroup,
   onRemove,
   onMove,
-  onChangeChild,
-  onAddChild,
-  onRemoveChild,
-  onMoveChild,
+  onUpdateItem,
+  onRemoveItem,
+  onMoveItem,
+  onAddChildSet,
+  onAddChildGroup,
 }: {
   group: SetGroup;
   unit: string;
+  section: Section;
   onChangeGroup: (p: Partial<SetGroup>) => void;
   onRemove: () => void;
   onMove: (dir: -1 | 1) => void;
-  onChangeChild: (childId: string, p: Partial<WorkoutSet>) => void;
-  onAddChild: () => void;
-  onRemoveChild: (childId: string) => void;
-  onMoveChild: (childId: string, dir: -1 | 1) => void;
+  onUpdateItem: (id: string, p: Partial<SectionItem>) => void;
+  onRemoveItem: (id: string) => void;
+  onMoveItem: (id: string, dir: -1 | 1) => void;
+  onAddChildSet: (groupId: string, section: Section) => void;
+  onAddChildGroup: (groupId: string, section: Section) => void;
 }) {
   const dist = itemDistance(group);
   const secs = itemSeconds(group);
@@ -435,25 +424,49 @@ function GroupRow({
             No sub-sets yet.
           </div>
         )}
-        {group.children.map((c) => (
-          <SetRow
-            key={c.id}
-            set={c}
-            unit={unit}
-            inGroup
-            onChange={(p) => onChangeChild(c.id, p)}
-            onRemove={() => onRemoveChild(c.id)}
-            onMove={(dir) => onMoveChild(c.id, dir)}
-          />
-        ))}
-        <Button size="sm" variant="ghost" onClick={onAddChild} className="print:hidden">
-          <Plus className="mr-1 h-3.5 w-3.5" /> Add sub-set
-        </Button>
+        {group.children.map((c) =>
+          isGroup(c) ? (
+            <GroupRow
+              key={c.id}
+              group={c}
+              unit={unit}
+              section={section}
+              onChangeGroup={(p) => onUpdateItem(c.id, p)}
+              onRemove={() => onRemoveItem(c.id)}
+              onMove={(dir) => onMoveItem(c.id, dir)}
+              onUpdateItem={onUpdateItem}
+              onRemoveItem={onRemoveItem}
+              onMoveItem={onMoveItem}
+              onAddChildSet={onAddChildSet}
+              onAddChildGroup={onAddChildGroup}
+            />
+          ) : (
+            <SetRow
+              key={c.id}
+              set={c}
+              unit={unit}
+              inGroup
+              onChange={(p) => onUpdateItem(c.id, p)}
+              onRemove={() => onRemoveItem(c.id)}
+              onMove={(dir) => onMoveItem(c.id, dir)}
+            />
+          ),
+        )}
+        <div className="flex gap-2 print:hidden">
+          <Button size="sm" variant="ghost" onClick={() => onAddChildSet(group.id, section)}>
+            <Plus className="mr-1 h-3.5 w-3.5" /> Sub-set
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => onAddChildGroup(group.id, section)}>
+            <Layers className="mr-1 h-3.5 w-3.5" /> Sub-group
+          </Button>
+        </div>
       </div>
 
       <div className="mt-1 hidden text-xs font-medium text-deep print:block">
         {group.rounds} rounds of{group.label ? ` — ${group.label}` : ""}:{" "}
-        {group.children.map((c) => describeSet(c, { hideRounds: true })).join("; ")}
+        {group.children
+          .map((c) => (isGroup(c) ? `[${c.rounds}× …]` : describeSet(c, { hideRounds: true })))
+          .join("; ")}
       </div>
     </div>
   );

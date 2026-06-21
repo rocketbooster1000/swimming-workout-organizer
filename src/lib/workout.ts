@@ -20,7 +20,7 @@ export type SetGroup = {
   section: Section;
   rounds: number;
   label?: string;
-  children: WorkoutSet[];
+  children: SectionItem[];
 };
 
 export type SectionItem = WorkoutSet | SetGroup;
@@ -75,9 +75,20 @@ export function setSeconds(s: WorkoutSet) {
   return reps * interval + (s.rounds || 1) * rest;
 }
 
+// Distance for a set when contained inside a group (its own rounds are ignored — the group's rounds multiply).
+function innerSetDistance(s: WorkoutSet) {
+  return (s.reps || 1) * (s.distance || 0);
+}
+function innerSetSeconds(s: WorkoutSet) {
+  return (s.reps || 1) * (s.interval_seconds ?? 0) + (s.rest_seconds ?? 0);
+}
+
 export function itemDistance(item: SectionItem): number {
   if (isGroup(item)) {
-    const inner = item.children.reduce((a, c) => a + (c.reps || 1) * (c.distance || 0), 0);
+    const inner = item.children.reduce(
+      (a, c) => a + (isGroup(c) ? itemDistance(c) : innerSetDistance(c)),
+      0,
+    );
     return (item.rounds || 1) * inner;
   }
   return setDistance(item);
@@ -85,10 +96,10 @@ export function itemDistance(item: SectionItem): number {
 
 export function itemSeconds(item: SectionItem): number {
   if (isGroup(item)) {
-    const inner = item.children.reduce((a, c) => {
-      const reps = c.reps || 1;
-      return a + reps * (c.interval_seconds ?? 0) + (c.rest_seconds ?? 0);
-    }, 0);
+    const inner = item.children.reduce(
+      (a, c) => a + (isGroup(c) ? itemSeconds(c) : innerSetSeconds(c)),
+      0,
+    );
     return (item.rounds || 1) * inner;
   }
   return setSeconds(item);
