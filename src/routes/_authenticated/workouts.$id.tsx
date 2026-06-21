@@ -360,8 +360,8 @@ function GroupRow({
   onUpdateItem: (id: string, p: Partial<SectionItem>) => void;
   onRemoveItem: (id: string) => void;
   onMoveItem: (id: string, dir: -1 | 1) => void;
-  onAddChildSet: (groupId: string, section: Section) => void;
-  onAddChildGroup: (groupId: string, section: Section) => void;
+  onAddChildSet: (groupId: string) => void;
+  onAddChildGroup: (groupId: string) => void;
 }) {
   const dist = itemDistance(group);
   const secs = itemSeconds(group);
