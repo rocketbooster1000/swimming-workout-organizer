@@ -10,7 +10,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import {
-  SECTIONS,
   STROKES,
   describeSet,
   formatDuration,
@@ -25,7 +24,6 @@ import {
   setDistance,
   setSeconds,
   totals,
-  type Section,
   type SectionItem,
   type SetGroup,
   type Workout,
@@ -126,29 +124,29 @@ function WorkoutBuilder() {
     mutateItems(walk);
   }
 
-  function addSet(section: Section) {
-    mutateItems((items) => [...items, newSet(section)]);
+  function addSet() {
+    mutateItems((items) => [...items, newSet()]);
   }
 
-  function addGroup(section: Section) {
-    mutateItems((items) => [...items, newGroup(section)]);
+  function addGroup() {
+    mutateItems((items) => [...items, newGroup()]);
   }
 
-  function addChildSet(groupId: string, section: Section) {
+  function addChildSet(groupId: string) {
     mutateItems((items) =>
       mapTree(items, (it) =>
         it.id === groupId && isGroup(it)
-          ? { ...it, children: [...it.children, newChildSet(section)] }
+          ? { ...it, children: [...it.children, newChildSet()] }
           : it,
       ),
     );
   }
 
-  function addChildGroup(groupId: string, section: Section) {
+  function addChildGroup(groupId: string) {
     mutateItems((items) =>
       mapTree(items, (it) =>
         it.id === groupId && isGroup(it)
-          ? { ...it, children: [...it.children, newGroup(section)] }
+          ? { ...it, children: [...it.children, newGroup()] }
           : it,
       ),
     );
@@ -278,68 +276,53 @@ function WorkoutBuilder() {
         </div>
       </div>
 
-      {/* Sections */}
+      {/* Sets */}
       <div className="mt-6 space-y-6">
-        {SECTIONS.map(({ key, label }) => {
-          const sectionItems = draft.sets.filter((s) => s.section === key);
-          const sd = sectionItems.reduce((a, s) => a + itemDistance(s), 0);
-          const ss = sectionItems.reduce((a, s) => a + itemSeconds(s), 0);
-          return (
-            <section key={key} className={`section-${key} rounded-xl p-5`}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="font-display text-xl font-semibold text-deep">{label}</h2>
-                  <div className="text-xs text-muted-foreground">
-                    {sd.toLocaleString()} {draft.pool_unit} · {formatDuration(ss)}
-                  </div>
-                </div>
-                <div className="flex gap-2 print:hidden">
-                  <Button size="sm" variant="outline" onClick={() => addSet(key)}>
-                    <Plus className="mr-1 h-3.5 w-3.5" /> Set
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => addGroup(key)}>
-                    <Layers className="mr-1 h-3.5 w-3.5" /> Group
-                  </Button>
-                </div>
-              </div>
+        <div className="flex items-center justify-between">
+          <h2 className="font-display text-xl font-semibold text-deep">Sets</h2>
+          <div className="flex gap-2 print:hidden">
+            <Button size="sm" variant="outline" onClick={addSet}>
+              <Plus className="mr-1 h-3.5 w-3.5" /> Set
+            </Button>
+            <Button size="sm" variant="outline" onClick={addGroup}>
+              <Layers className="mr-1 h-3.5 w-3.5" /> Group
+            </Button>
+          </div>
+        </div>
 
-              <div className="mt-4 space-y-3">
-                {sectionItems.length === 0 && (
-                  <div className="rounded-lg border border-dashed border-border/60 bg-card/50 p-6 text-center text-xs text-muted-foreground">
-                    No sets yet — add a {label.toLowerCase()} block.
-                  </div>
-                )}
-                {sectionItems.map((item) =>
-                  isGroup(item) ? (
-                    <GroupRow
-                      key={item.id}
-                      group={item}
-                      unit={draft.pool_unit}
-                      section={key}
-                      onChangeGroup={(p) => updateItem(item.id, p)}
-                      onRemove={() => removeItem(item.id)}
-                      onMove={(dir) => moveItem(item.id, dir)}
-                      onUpdateItem={updateItem}
-                      onRemoveItem={removeItem}
-                      onMoveItem={moveItem}
-                      onAddChildSet={addChildSet}
-                      onAddChildGroup={addChildGroup}
-                    />
-                  ) : (
-                    <SetRow
-                      key={item.id}
-                      set={item}
-                      unit={draft.pool_unit}
-                      onChange={(p) => updateItem(item.id, p)}
-                      onRemove={() => removeItem(item.id)}
-                      onMove={(dir) => moveItem(item.id, dir)}
-                    />
-                  ),
-                )}
-              </div>
-            </section>
-          );
-        })}
+        <div className="mt-4 space-y-3">
+          {draft.sets.length === 0 && (
+            <div className="rounded-lg border border-dashed border-border/60 bg-card/50 p-6 text-center text-xs text-muted-foreground">
+              No sets yet — add a block.
+            </div>
+          )}
+          {draft.sets.map((item) =>
+            isGroup(item) ? (
+              <GroupRow
+                key={item.id}
+                group={item}
+                unit={draft.pool_unit}
+                onChangeGroup={(p) => updateItem(item.id, p)}
+                onRemove={() => removeItem(item.id)}
+                onMove={(dir) => moveItem(item.id, dir)}
+                onUpdateItem={updateItem}
+                onRemoveItem={removeItem}
+                onMoveItem={moveItem}
+                onAddChildSet={addChildSet}
+                onAddChildGroup={addChildGroup}
+              />
+            ) : (
+              <SetRow
+                key={item.id}
+                set={item}
+                unit={draft.pool_unit}
+                onChange={(p) => updateItem(item.id, p)}
+                onRemove={() => removeItem(item.id)}
+                onMove={(dir) => moveItem(item.id, dir)}
+              />
+            ),
+          )}
+        </div>
       </div>
 
       <div className="mt-8 print:hidden">
@@ -359,7 +342,6 @@ function WorkoutBuilder() {
 function GroupRow({
   group,
   unit,
-  section,
   onChangeGroup,
   onRemove,
   onMove,
@@ -371,15 +353,15 @@ function GroupRow({
 }: {
   group: SetGroup;
   unit: string;
-  section: Section;
+  
   onChangeGroup: (p: Partial<SetGroup>) => void;
   onRemove: () => void;
   onMove: (dir: -1 | 1) => void;
   onUpdateItem: (id: string, p: Partial<SectionItem>) => void;
   onRemoveItem: (id: string) => void;
   onMoveItem: (id: string, dir: -1 | 1) => void;
-  onAddChildSet: (groupId: string, section: Section) => void;
-  onAddChildGroup: (groupId: string, section: Section) => void;
+  onAddChildSet: (groupId: string) => void;
+  onAddChildGroup: (groupId: string) => void;
 }) {
   const dist = itemDistance(group);
   const secs = itemSeconds(group);
@@ -430,7 +412,6 @@ function GroupRow({
               key={c.id}
               group={c}
               unit={unit}
-              section={section}
               onChangeGroup={(p) => onUpdateItem(c.id, p)}
               onRemove={() => onRemoveItem(c.id)}
               onMove={(dir) => onMoveItem(c.id, dir)}
@@ -453,10 +434,10 @@ function GroupRow({
           ),
         )}
         <div className="flex gap-2 print:hidden">
-          <Button size="sm" variant="ghost" onClick={() => onAddChildSet(group.id, section)}>
+          <Button size="sm" variant="ghost" onClick={() => onAddChildSet(group.id)}>
             <Plus className="mr-1 h-3.5 w-3.5" /> Sub-set
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => onAddChildGroup(group.id, section)}>
+          <Button size="sm" variant="ghost" onClick={() => onAddChildGroup(group.id)}>
             <Layers className="mr-1 h-3.5 w-3.5" /> Sub-group
           </Button>
         </div>

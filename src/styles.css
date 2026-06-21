@@ -35,9 +35,6 @@
   --color-deep: var(--deep);
   --color-lane: var(--lane);
   --color-foam: var(--foam);
-  --color-warmup: var(--warmup);
-  --color-main: var(--main);
-  --color-cooldown: var(--cooldown);
 
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
@@ -88,9 +85,6 @@
   --deep: oklch(0.18 0.06 245);
   --lane: oklch(0.72 0.16 225);
   --foam: oklch(0.985 0.012 220);
-  --warmup: oklch(0.82 0.12 195);   /* teal */
-  --main: oklch(0.68 0.18 230);     /* aqua */
-  --cooldown: oklch(0.78 0.10 270); /* periwinkle */
 
   --sidebar: oklch(0.22 0.07 245);
   --sidebar-foreground: oklch(0.95 0.02 220);

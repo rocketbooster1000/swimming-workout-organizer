@@ -1,9 +1,6 @@
-export type Section = "warmup" | "main" | "cooldown";
-
 export type WorkoutSet = {
   id: string;
   type?: "set";
-  section: Section;
   rounds: number;
   reps: number;
   distance: number;
@@ -17,7 +14,6 @@ export type WorkoutSet = {
 export type SetGroup = {
   id: string;
   type: "group";
-  section: Section;
   rounds: number;
   label?: string;
   children: SectionItem[];
@@ -58,11 +54,6 @@ export const STROKES = [
   "Pull",
 ];
 
-export const SECTIONS: { key: Section; label: string }[] = [
-  { key: "warmup", label: "Warm-up" },
-  { key: "main", label: "Main Set" },
-  { key: "cooldown", label: "Cool-down" },
-];
 
 export function setDistance(s: WorkoutSet) {
   return (s.rounds || 1) * (s.reps || 1) * (s.distance || 0);
@@ -152,11 +143,10 @@ export function describeSet(s: WorkoutSet, opts?: { hideRounds?: boolean }) {
   return `${rounds}${reps}${stroke}${interval}`.trim();
 }
 
-export function newSet(section: Section): WorkoutSet {
+export function newSet(): WorkoutSet {
   return {
     id: crypto.randomUUID(),
     type: "set",
-    section,
     rounds: 1,
     reps: 4,
     distance: 50,
@@ -168,17 +158,16 @@ export function newSet(section: Section): WorkoutSet {
   };
 }
 
-export function newChildSet(section: Section): WorkoutSet {
-  return { ...newSet(section), reps: 3, distance: 50 };
+export function newChildSet(): WorkoutSet {
+  return { ...newSet(), reps: 3, distance: 50 };
 }
 
-export function newGroup(section: Section): SetGroup {
+export function newGroup(): SetGroup {
   return {
     id: crypto.randomUUID(),
     type: "group",
-    section,
     rounds: 2,
     label: "",
-    children: [newChildSet(section), newChildSet(section)],
+    children: [newChildSet(), newChildSet()],
   };
 }
