@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, GripVertical, Layers, Plus, Printer, Save, Trash2, Waves } from "lucide-react";
+import { ArrowLeft, GripVertical, Hourglass, Layers, Plus, Printer, Save, Trash2, Waves } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,15 +15,18 @@ import {
   formatDuration,
   formatInterval,
   isGroup,
+  isRest,
   itemDistance,
   itemSeconds,
   newChildSet,
   newGroup,
+  newRest,
   newSet,
   parseInterval,
   setDistance,
   setSeconds,
   totals,
+  type RestItem,
   type SectionItem,
   type SetGroup,
   type Workout,
@@ -132,6 +135,10 @@ function WorkoutBuilder() {
     mutateItems((items) => [...items, newGroup()]);
   }
 
+  function addRest() {
+    mutateItems((items) => [...items, newRest()]);
+  }
+
   function addChildSet(groupId: string) {
     mutateItems((items) =>
       mapTree(items, (it) =>
@@ -147,6 +154,16 @@ function WorkoutBuilder() {
       mapTree(items, (it) =>
         it.id === groupId && isGroup(it)
           ? { ...it, children: [...it.children, newGroup()] }
+          : it,
+      ),
+    );
+  }
+
+  function addChildRest(groupId: string) {
+    mutateItems((items) =>
+      mapTree(items, (it) =>
+        it.id === groupId && isGroup(it)
+          ? { ...it, children: [...it.children, newRest()] }
           : it,
       ),
     );
@@ -287,6 +304,9 @@ function WorkoutBuilder() {
             <Button size="sm" variant="outline" onClick={addGroup}>
               <Layers className="mr-1 h-3.5 w-3.5" /> Group
             </Button>
+            <Button size="sm" variant="outline" onClick={addRest}>
+              <Hourglass className="mr-1 h-3.5 w-3.5" /> Rest
+            </Button>
           </div>
         </div>
 
@@ -310,6 +330,15 @@ function WorkoutBuilder() {
                 onMoveItem={moveItem}
                 onAddChildSet={addChildSet}
                 onAddChildGroup={addChildGroup}
+                onAddChildRest={addChildRest}
+              />
+            ) : isRest(item) ? (
+              <RestRow
+                key={item.id}
+                rest={item}
+                onChange={(p) => updateItem(item.id, p)}
+                onRemove={() => removeItem(item.id)}
+                onMove={(dir) => moveItem(item.id, dir)}
               />
             ) : (
               <SetRow
@@ -324,6 +353,7 @@ function WorkoutBuilder() {
           )}
         </div>
       </div>
+
 
       <div className="mt-8 print:hidden">
         <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Practice notes</Label>
@@ -350,6 +380,7 @@ function GroupRow({
   onMoveItem,
   onAddChildSet,
   onAddChildGroup,
+  onAddChildRest,
 }: {
   group: SetGroup;
   unit: string;
@@ -362,6 +393,7 @@ function GroupRow({
   onMoveItem: (id: string, dir: -1 | 1) => void;
   onAddChildSet: (groupId: string) => void;
   onAddChildGroup: (groupId: string) => void;
+  onAddChildRest: (groupId: string) => void;
 }) {
   const dist = itemDistance(group);
   const secs = itemSeconds(group);
@@ -420,13 +452,21 @@ function GroupRow({
               onMoveItem={onMoveItem}
               onAddChildSet={onAddChildSet}
               onAddChildGroup={onAddChildGroup}
+              onAddChildRest={onAddChildRest}
+            />
+          ) : isRest(c) ? (
+            <RestRow
+              key={c.id}
+              rest={c}
+              onChange={(p) => onUpdateItem(c.id, p)}
+              onRemove={() => onRemoveItem(c.id)}
+              onMove={(dir) => onMoveItem(c.id, dir)}
             />
           ) : (
             <SetRow
               key={c.id}
               set={c}
               unit={unit}
-              inGroup
               onChange={(p) => onUpdateItem(c.id, p)}
               onRemove={() => onRemoveItem(c.id)}
               onMove={(dir) => onMoveItem(c.id, dir)}
@@ -440,13 +480,22 @@ function GroupRow({
           <Button size="sm" variant="ghost" onClick={() => onAddChildGroup(group.id)}>
             <Layers className="mr-1 h-3.5 w-3.5" /> Sub-group
           </Button>
+          <Button size="sm" variant="ghost" onClick={() => onAddChildRest(group.id)}>
+            <Hourglass className="mr-1 h-3.5 w-3.5" /> Rest
+          </Button>
         </div>
       </div>
 
       <div className="mt-1 hidden text-xs font-medium text-deep print:block">
         {group.rounds} rounds of{group.label ? ` — ${group.label}` : ""}:{" "}
         {group.children
-          .map((c) => (isGroup(c) ? `[${c.rounds}× …]` : describeSet(c, { hideRounds: true })))
+          .map((c) =>
+            isGroup(c)
+              ? `[${c.rounds}× …]`
+              : isRest(c)
+                ? `rest ${c.seconds}s`
+                : describeSet(c),
+          )
           .join("; ")}
       </div>
     </div>
@@ -456,24 +505,18 @@ function GroupRow({
 function SetRow({
   set,
   unit,
-  inGroup,
   onChange,
   onRemove,
   onMove,
 }: {
   set: WorkoutSet;
   unit: string;
-  inGroup?: boolean;
   onChange: (p: Partial<WorkoutSet>) => void;
   onRemove: () => void;
   onMove: (dir: -1 | 1) => void;
 }) {
   const [intervalStr, setIntervalStr] = useState(formatInterval(set.interval_seconds));
   useEffect(() => setIntervalStr(formatInterval(set.interval_seconds)), [set.interval_seconds]);
-
-  const childReps = (set.reps || 1);
-  const childDist = childReps * (set.distance || 0);
-  const childSecs = childReps * (set.interval_seconds ?? 0) + (set.rest_seconds ?? 0);
 
   return (
     <div className="rounded-lg border border-border/60 bg-card/80 p-3">
@@ -483,17 +526,10 @@ function SetRow({
           <GripVertical className="h-4 w-4 text-muted-foreground/60" />
           <button onClick={() => onMove(1)} className="text-xs text-muted-foreground hover:text-deep">▼</button>
         </div>
-        {!inGroup && (
-          <>
-            <Field label="Rounds" w="w-16">
-              <Input type="number" min={1} value={set.rounds} onChange={(e) => onChange({ rounds: parseInt(e.target.value) || 1 })} />
-            </Field>
-            <span className="pb-2 text-muted-foreground">×</span>
-          </>
-        )}
         <Field label="Reps" w="w-16">
           <Input type="number" min={1} value={set.reps} onChange={(e) => onChange({ reps: parseInt(e.target.value) || 1 })} />
         </Field>
+        <span className="pb-2 text-muted-foreground">×</span>
         <Field label={`Dist (${unit})`} w="w-20">
           <Input type="number" min={0} step={25} value={set.distance} onChange={(e) => onChange({ distance: parseInt(e.target.value) || 0 })} />
         </Field>
@@ -513,21 +549,13 @@ function SetRow({
             onBlur={() => onChange({ interval_seconds: parseInterval(intervalStr) })}
           />
         </Field>
-        <Field label="Rest (s)" w="w-20">
-          <Input
-            type="number"
-            min={0}
-            value={set.rest_seconds ?? ""}
-            onChange={(e) => onChange({ rest_seconds: e.target.value ? parseInt(e.target.value) : null })}
-          />
-        </Field>
         <div className="ml-auto flex items-center gap-3">
           <div className="text-right">
             <div className="font-display text-base font-semibold tabular-nums text-deep">
-              {(inGroup ? childDist : setDistance(set)).toLocaleString()} {unit}
+              {setDistance(set).toLocaleString()} {unit}
             </div>
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-              {formatDuration(inGroup ? childSecs : setSeconds(set)) || "—"}
+              {formatDuration(setSeconds(set)) || "—"}
             </div>
           </div>
           <Button size="icon" variant="ghost" onClick={onRemove} className="print:hidden">
@@ -549,7 +577,58 @@ function SetRow({
           className="h-8 w-56 text-xs"
         />
       </div>
-      <div className="mt-1 hidden text-xs font-medium text-deep print:block">{describeSet(set, { hideRounds: inGroup })}</div>
+      <div className="mt-1 hidden text-xs font-medium text-deep print:block">{describeSet(set)}</div>
+    </div>
+  );
+}
+
+function RestRow({
+  rest,
+  onChange,
+  onRemove,
+  onMove,
+}: {
+  rest: RestItem;
+  onChange: (p: Partial<RestItem>) => void;
+  onRemove: () => void;
+  onMove: (dir: -1 | 1) => void;
+}) {
+  return (
+    <div className="rounded-lg border border-dashed border-primary/40 bg-foam/30 p-3">
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="flex flex-col items-center gap-1 print:hidden">
+          <button onClick={() => onMove(-1)} className="text-xs text-muted-foreground hover:text-deep">▲</button>
+          <Hourglass className="h-4 w-4 text-primary/70" />
+          <button onClick={() => onMove(1)} className="text-xs text-muted-foreground hover:text-deep">▼</button>
+        </div>
+        <Field label="Rest (s)" w="w-24">
+          <Input
+            type="number"
+            min={0}
+            value={rest.seconds}
+            onChange={(e) => onChange({ seconds: parseInt(e.target.value) || 0 })}
+          />
+        </Field>
+        <Field label="Note (optional)" w="flex-1 min-w-40">
+          <Input
+            value={rest.label ?? ""}
+            onChange={(e) => onChange({ label: e.target.value })}
+            placeholder="e.g. extra recovery, get water"
+          />
+        </Field>
+        <div className="ml-auto flex items-center gap-3">
+          <div className="text-right">
+            <div className="font-display text-base font-semibold tabular-nums text-deep">Rest</div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{formatDuration(rest.seconds) || "—"}</div>
+          </div>
+          <Button size="icon" variant="ghost" onClick={onRemove} className="print:hidden">
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+      <div className="mt-1 hidden text-xs font-medium text-deep print:block">
+        Rest {rest.seconds}s{rest.label ? ` — ${rest.label}` : ""}
+      </div>
     </div>
   );
 }
