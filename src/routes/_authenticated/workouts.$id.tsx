@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, GripVertical, Layers, Plus, Printer, Save, Trash2, Waves } from "lucide-react";
+import { ArrowLeft, GripVertical, Hourglass, Layers, Plus, Printer, Save, Trash2, Waves } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,15 +15,18 @@ import {
   formatDuration,
   formatInterval,
   isGroup,
+  isRest,
   itemDistance,
   itemSeconds,
   newChildSet,
   newGroup,
+  newRest,
   newSet,
   parseInterval,
   setDistance,
   setSeconds,
   totals,
+  type RestItem,
   type SectionItem,
   type SetGroup,
   type Workout,
