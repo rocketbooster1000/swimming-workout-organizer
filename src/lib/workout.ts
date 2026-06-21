@@ -54,17 +54,6 @@ export const STROKES = [
   "Pull",
 ];
 
-export const STROKES = [
-  "Freestyle",
-  "Backstroke",
-  "Breaststroke",
-  "Butterfly",
-  "IM",
-  "Choice",
-  "Kick",
-  "Drill",
-  "Pull",
-];
 
 export function setDistance(s: WorkoutSet) {
   return (s.rounds || 1) * (s.reps || 1) * (s.distance || 0);
