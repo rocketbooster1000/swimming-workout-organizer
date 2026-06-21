@@ -85,37 +85,45 @@ function WorkoutBuilder() {
     setDirty(true);
   }
 
+  // Recursive tree helpers — operate on any item by id, at any nesting depth.
+  function mapTree(items: SectionItem[], fn: (it: SectionItem) => SectionItem | null): SectionItem[] {
+    const out: SectionItem[] = [];
+    for (const it of items) {
+      const mapped = fn(it);
+      if (mapped === null) continue;
+      if (isGroup(mapped)) {
+        out.push({ ...mapped, children: mapTree(mapped.children, fn) });
+      } else {
+        out.push(mapped);
+      }
+    }
+    return out;
+  }
+
   function updateItem(itemId: string, patch: Partial<SectionItem>) {
     mutateItems((items) =>
-      items.map((it) => (it.id === itemId ? ({ ...it, ...patch } as SectionItem) : it)),
+      mapTree(items, (it) => (it.id === itemId ? ({ ...it, ...patch } as SectionItem) : it)),
     );
   }
 
   function removeItem(itemId: string) {
-    mutateItems((items) => items.filter((it) => it.id !== itemId));
+    mutateItems((items) => mapTree(items, (it) => (it.id === itemId ? null : it)));
   }
 
-  function moveItem(itemId: string, dir: -1 | 1, section: Section) {
-    mutateItems((items) => {
-      const sectionItems = items.filter((s) => s.section === section);
-      const idx = sectionItems.findIndex((s) => s.id === itemId);
-      const target = idx + dir;
-      if (idx < 0 || target < 0 || target >= sectionItems.length) return items;
-      [sectionItems[idx], sectionItems[target]] = [sectionItems[target], sectionItems[idx]];
-      // rebuild full items keeping other sections order
-      const others = items.filter((s) => s.section !== section);
-      // preserve placement by re-merging in original order grouped by section
-      const result: SectionItem[] = [];
-      let si = 0;
-      for (const it of items) {
-        if (it.section === section) {
-          result.push(sectionItems[si++]);
-        } else {
-          result.push(it);
-        }
+  // Move within whatever sibling list contains the item.
+  function moveItem(itemId: string, dir: -1 | 1) {
+    function walk(items: SectionItem[]): SectionItem[] {
+      const idx = items.findIndex((s) => s.id === itemId);
+      if (idx >= 0) {
+        const target = idx + dir;
+        if (target < 0 || target >= items.length) return items;
+        const next = [...items];
+        [next[idx], next[target]] = [next[target], next[idx]];
+        return next;
       }
-      return result;
-    });
+      return items.map((it) => (isGroup(it) ? { ...it, children: walk(it.children) } : it));
+    }
+    mutateItems(walk);
   }
 
   function addSet(section: Section) {
@@ -126,21 +134,9 @@ function WorkoutBuilder() {
     mutateItems((items) => [...items, newGroup(section)]);
   }
 
-  function updateChild(groupId: string, childId: string, patch: Partial<WorkoutSet>) {
+  function addChildSet(groupId: string, section: Section) {
     mutateItems((items) =>
-      items.map((it) => {
-        if (it.id !== groupId || !isGroup(it)) return it;
-        return {
-          ...it,
-          children: it.children.map((c) => (c.id === childId ? { ...c, ...patch } : c)),
-        };
-      }),
-    );
-  }
-
-  function addChild(groupId: string, section: Section) {
-    mutateItems((items) =>
-      items.map((it) =>
+      mapTree(items, (it) =>
         it.id === groupId && isGroup(it)
           ? { ...it, children: [...it.children, newChildSet(section)] }
           : it,
@@ -148,29 +144,16 @@ function WorkoutBuilder() {
     );
   }
 
-  function removeChild(groupId: string, childId: string) {
+  function addChildGroup(groupId: string, section: Section) {
     mutateItems((items) =>
-      items.map((it) =>
+      mapTree(items, (it) =>
         it.id === groupId && isGroup(it)
-          ? { ...it, children: it.children.filter((c) => c.id !== childId) }
+          ? { ...it, children: [...it.children, newGroup(section)] }
           : it,
       ),
     );
   }
 
-  function moveChild(groupId: string, childId: string, dir: -1 | 1) {
-    mutateItems((items) =>
-      items.map((it) => {
-        if (it.id !== groupId || !isGroup(it)) return it;
-        const idx = it.children.findIndex((c) => c.id === childId);
-        const target = idx + dir;
-        if (idx < 0 || target < 0 || target >= it.children.length) return it;
-        const next = [...it.children];
-        [next[idx], next[target]] = [next[target], next[idx]];
-        return { ...it, children: next };
-      }),
-    );
-  }
 
   async function save() {
     if (!draft) return;
