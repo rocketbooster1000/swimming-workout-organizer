@@ -380,6 +380,7 @@ function GroupRow({
   onMoveItem,
   onAddChildSet,
   onAddChildGroup,
+  onAddChildRest,
 }: {
   group: SetGroup;
   unit: string;
@@ -392,6 +393,7 @@ function GroupRow({
   onMoveItem: (id: string, dir: -1 | 1) => void;
   onAddChildSet: (groupId: string) => void;
   onAddChildGroup: (groupId: string) => void;
+  onAddChildRest: (groupId: string) => void;
 }) {
   const dist = itemDistance(group);
   const secs = itemSeconds(group);
