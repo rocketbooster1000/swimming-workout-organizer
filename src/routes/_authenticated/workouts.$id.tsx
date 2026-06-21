@@ -359,23 +359,27 @@ function WorkoutBuilder() {
 function GroupRow({
   group,
   unit,
+  section,
   onChangeGroup,
   onRemove,
   onMove,
-  onChangeChild,
-  onAddChild,
-  onRemoveChild,
-  onMoveChild,
+  onUpdateItem,
+  onRemoveItem,
+  onMoveItem,
+  onAddChildSet,
+  onAddChildGroup,
 }: {
   group: SetGroup;
   unit: string;
+  section: Section;
   onChangeGroup: (p: Partial<SetGroup>) => void;
   onRemove: () => void;
   onMove: (dir: -1 | 1) => void;
-  onChangeChild: (childId: string, p: Partial<WorkoutSet>) => void;
-  onAddChild: () => void;
-  onRemoveChild: (childId: string) => void;
-  onMoveChild: (childId: string, dir: -1 | 1) => void;
+  onUpdateItem: (id: string, p: Partial<SectionItem>) => void;
+  onRemoveItem: (id: string) => void;
+  onMoveItem: (id: string, dir: -1 | 1) => void;
+  onAddChildSet: (groupId: string, section: Section) => void;
+  onAddChildGroup: (groupId: string, section: Section) => void;
 }) {
   const dist = itemDistance(group);
   const secs = itemSeconds(group);
@@ -420,25 +424,49 @@ function GroupRow({
             No sub-sets yet.
           </div>
         )}
-        {group.children.map((c) => (
-          <SetRow
-            key={c.id}
-            set={c}
-            unit={unit}
-            inGroup
-            onChange={(p) => onChangeChild(c.id, p)}
-            onRemove={() => onRemoveChild(c.id)}
-            onMove={(dir) => onMoveChild(c.id, dir)}
-          />
-        ))}
-        <Button size="sm" variant="ghost" onClick={onAddChild} className="print:hidden">
-          <Plus className="mr-1 h-3.5 w-3.5" /> Add sub-set
-        </Button>
+        {group.children.map((c) =>
+          isGroup(c) ? (
+            <GroupRow
+              key={c.id}
+              group={c}
+              unit={unit}
+              section={section}
+              onChangeGroup={(p) => onUpdateItem(c.id, p)}
+              onRemove={() => onRemoveItem(c.id)}
+              onMove={(dir) => onMoveItem(c.id, dir)}
+              onUpdateItem={onUpdateItem}
+              onRemoveItem={onRemoveItem}
+              onMoveItem={onMoveItem}
+              onAddChildSet={onAddChildSet}
+              onAddChildGroup={onAddChildGroup}
+            />
+          ) : (
+            <SetRow
+              key={c.id}
+              set={c}
+              unit={unit}
+              inGroup
+              onChange={(p) => onUpdateItem(c.id, p)}
+              onRemove={() => onRemoveItem(c.id)}
+              onMove={(dir) => onMoveItem(c.id, dir)}
+            />
+          ),
+        )}
+        <div className="flex gap-2 print:hidden">
+          <Button size="sm" variant="ghost" onClick={() => onAddChildSet(group.id, section)}>
+            <Plus className="mr-1 h-3.5 w-3.5" /> Sub-set
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => onAddChildGroup(group.id, section)}>
+            <Layers className="mr-1 h-3.5 w-3.5" /> Sub-group
+          </Button>
+        </div>
       </div>
 
       <div className="mt-1 hidden text-xs font-medium text-deep print:block">
         {group.rounds} rounds of{group.label ? ` — ${group.label}` : ""}:{" "}
-        {group.children.map((c) => describeSet(c, { hideRounds: true })).join("; ")}
+        {group.children
+          .map((c) => (isGroup(c) ? `[${c.rounds}× …]` : describeSet(c, { hideRounds: true })))
+          .join("; ")}
       </div>
     </div>
   );
