@@ -304,6 +304,9 @@ function WorkoutBuilder() {
             <Button size="sm" variant="outline" onClick={addGroup}>
               <Layers className="mr-1 h-3.5 w-3.5" /> Group
             </Button>
+            <Button size="sm" variant="outline" onClick={addRest}>
+              <Hourglass className="mr-1 h-3.5 w-3.5" /> Rest
+            </Button>
           </div>
         </div>
 
@@ -327,6 +330,15 @@ function WorkoutBuilder() {
                 onMoveItem={moveItem}
                 onAddChildSet={addChildSet}
                 onAddChildGroup={addChildGroup}
+                onAddChildRest={addChildRest}
+              />
+            ) : isRest(item) ? (
+              <RestRow
+                key={item.id}
+                rest={item}
+                onChange={(p) => updateItem(item.id, p)}
+                onRemove={() => removeItem(item.id)}
+                onMove={(dir) => moveItem(item.id, dir)}
               />
             ) : (
               <SetRow
@@ -341,6 +353,7 @@ function WorkoutBuilder() {
           )}
         </div>
       </div>
+
 
       <div className="mt-8 print:hidden">
         <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Practice notes</Label>
