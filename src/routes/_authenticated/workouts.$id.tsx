@@ -135,6 +135,10 @@ function WorkoutBuilder() {
     mutateItems((items) => [...items, newGroup()]);
   }
 
+  function addRest() {
+    mutateItems((items) => [...items, newRest()]);
+  }
+
   function addChildSet(groupId: string) {
     mutateItems((items) =>
       mapTree(items, (it) =>
@@ -150,6 +154,16 @@ function WorkoutBuilder() {
       mapTree(items, (it) =>
         it.id === groupId && isGroup(it)
           ? { ...it, children: [...it.children, newGroup()] }
+          : it,
+      ),
+    );
+  }
+
+  function addChildRest(groupId: string) {
+    mutateItems((items) =>
+      mapTree(items, (it) =>
+        it.id === groupId && isGroup(it)
+          ? { ...it, children: [...it.children, newRest()] }
           : it,
       ),
     );
