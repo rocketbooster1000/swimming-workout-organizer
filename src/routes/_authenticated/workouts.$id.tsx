@@ -315,13 +315,15 @@ function WorkoutBuilder() {
                       key={item.id}
                       group={item}
                       unit={draft.pool_unit}
+                      section={key}
                       onChangeGroup={(p) => updateItem(item.id, p)}
                       onRemove={() => removeItem(item.id)}
-                      onMove={(dir) => moveItem(item.id, dir, key)}
-                      onChangeChild={(cid, p) => updateChild(item.id, cid, p)}
-                      onAddChild={() => addChild(item.id, key)}
-                      onRemoveChild={(cid) => removeChild(item.id, cid)}
-                      onMoveChild={(cid, dir) => moveChild(item.id, cid, dir)}
+                      onMove={(dir) => moveItem(item.id, dir)}
+                      onUpdateItem={updateItem}
+                      onRemoveItem={removeItem}
+                      onMoveItem={moveItem}
+                      onAddChildSet={addChildSet}
+                      onAddChildGroup={addChildGroup}
                     />
                   ) : (
                     <SetRow
@@ -330,7 +332,7 @@ function WorkoutBuilder() {
                       unit={draft.pool_unit}
                       onChange={(p) => updateItem(item.id, p)}
                       onRemove={() => removeItem(item.id)}
-                      onMove={(dir) => moveItem(item.id, dir, key)}
+                      onMove={(dir) => moveItem(item.id, dir)}
                     />
                   ),
                 )}
