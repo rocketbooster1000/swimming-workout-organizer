@@ -77,6 +77,7 @@ function WorkoutBuilder() {
   }, [workout, draft]);
 
   const tot = useMemo(() => (draft ? totals(draft.sets) : { distance: 0, seconds: 0 }), [draft]);
+  const displayUnit = useMemo(() => (draft ? courseUnit(draft.pool_unit) : "yd"), [draft]);
 
   function update<K extends keyof Workout>(key: K, value: Workout[K]) {
     setDraft((d) => (d ? { ...d, [key]: value } : d));
