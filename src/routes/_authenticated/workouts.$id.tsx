@@ -251,7 +251,7 @@ function WorkoutBuilder() {
           </div>
           <div className="grid grid-cols-2 gap-2 text-right">
             <div className="rounded-lg bg-deep px-4 py-3 text-foam">
-              <div className="text-[10px] uppercase tracking-widest opacity-70">Total {draft.pool_unit}</div>
+              <div className="text-[10px] uppercase tracking-widest opacity-70">Total {displayUnit}</div>
               <div className="font-display text-2xl font-semibold tabular-nums">{tot.distance.toLocaleString()}</div>
             </div>
             <div className="rounded-lg bg-primary px-4 py-3 text-primary-foreground">
