@@ -63,6 +63,21 @@ export const STROKES = [
   "Pull",
 ];
 
+export function courseUnit(course: string): "yd" | "m" {
+  if (course === "scy") return "yd";
+  return "m";
+}
+
+export function courseLength(course: string): number {
+  if (course === "scy") return 25;
+  if (course === "lcm") return 50;
+  if (course === "scm") return 25;
+  // legacy fallbacks
+  if (course === "yd") return 25;
+  if (course === "m") return 50;
+  return 25;
+}
+
 
 export function setDistance(s: WorkoutSet) {
   return (s.reps || 1) * (s.distance || 0);

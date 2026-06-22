@@ -11,6 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import {
   STROKES,
+  courseLength,
+  courseUnit,
   describeSet,
   formatDuration,
   formatInterval,
@@ -75,6 +77,7 @@ function WorkoutBuilder() {
   }, [workout, draft]);
 
   const tot = useMemo(() => (draft ? totals(draft.sets) : { distance: 0, seconds: 0 }), [draft]);
+  const displayUnit = useMemo(() => (draft ? courseUnit(draft.pool_unit) : "yd"), [draft]);
 
   function update<K extends keyof Workout>(key: K, value: Workout[K]) {
     setDraft((d) => (d ? { ...d, [key]: value } : d));
@@ -248,7 +251,7 @@ function WorkoutBuilder() {
           </div>
           <div className="grid grid-cols-2 gap-2 text-right">
             <div className="rounded-lg bg-deep px-4 py-3 text-foam">
-              <div className="text-[10px] uppercase tracking-widest opacity-70">Total {draft.pool_unit}</div>
+              <div className="text-[10px] uppercase tracking-widest opacity-70">Total {displayUnit}</div>
               <div className="font-display text-2xl font-semibold tabular-nums">{tot.distance.toLocaleString()}</div>
             </div>
             <div className="rounded-lg bg-primary px-4 py-3 text-primary-foreground">
@@ -260,14 +263,21 @@ function WorkoutBuilder() {
 
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
           <div>
-            <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Pool length</Label>
+            <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Course</Label>
             <div className="mt-1 flex gap-2">
               <Input type="number" min={10} value={draft.pool_length} onChange={(e) => update("pool_length", parseInt(e.target.value) || 25)} className="w-20" />
-              <Select value={draft.pool_unit} onValueChange={(v) => update("pool_unit", v)}>
-                <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+              <Select
+                value={draft.pool_unit}
+                onValueChange={(v) => {
+                  update("pool_unit", v);
+                  update("pool_length", courseLength(v));
+                }}
+              >
+                <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="yd">yards</SelectItem>
-                  <SelectItem value="m">meters</SelectItem>
+                  <SelectItem value="scy">SCY</SelectItem>
+                  <SelectItem value="lcm">LCM</SelectItem>
+                  <SelectItem value="scm">SCM</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -321,7 +331,7 @@ function WorkoutBuilder() {
               <GroupRow
                 key={item.id}
                 group={item}
-                unit={draft.pool_unit}
+                unit={displayUnit}
                 onChangeGroup={(p) => updateItem(item.id, p)}
                 onRemove={() => removeItem(item.id)}
                 onMove={(dir) => moveItem(item.id, dir)}
@@ -344,7 +354,7 @@ function WorkoutBuilder() {
               <SetRow
                 key={item.id}
                 set={item}
-                unit={draft.pool_unit}
+                unit={displayUnit}
                 onChange={(p) => updateItem(item.id, p)}
                 onRemove={() => removeItem(item.id)}
                 onMove={(dir) => moveItem(item.id, dir)}

@@ -38,7 +38,7 @@ function Dashboard() {
         focus: "Aerobic",
         level: "intermediate",
         pool_length: 25,
-        pool_unit: "yd",
+        pool_unit: "scy",
         sets: [],
       })
       .select()
