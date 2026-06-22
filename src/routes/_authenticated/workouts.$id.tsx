@@ -354,7 +354,7 @@ function WorkoutBuilder() {
               <SetRow
                 key={item.id}
                 set={item}
-                unit={draft.pool_unit}
+                unit={displayUnit}
                 onChange={(p) => updateItem(item.id, p)}
                 onRemove={() => removeItem(item.id)}
                 onMove={(dir) => moveItem(item.id, dir)}
