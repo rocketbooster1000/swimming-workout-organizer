@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { LogOut, Waves } from "lucide-react";
+import { LogOut, Waves, BarChart3, ListChecks } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useQueryClient } from "@tanstack/react-query";
@@ -24,9 +24,17 @@ export function AppHeader() {
           </span>
           Lanes
         </Link>
-        <Button variant="ghost" size="sm" onClick={signOut}>
-          <LogOut className="mr-1 h-4 w-4" /> Sign out
-        </Button>
+        <nav className="flex items-center gap-1">
+          <Link to="/dashboard">
+            <Button variant="ghost" size="sm"><ListChecks className="mr-1 h-4 w-4" /> Workouts</Button>
+          </Link>
+          <Link to="/summary">
+            <Button variant="ghost" size="sm"><BarChart3 className="mr-1 h-4 w-4" /> Summary</Button>
+          </Link>
+          <Button variant="ghost" size="sm" onClick={signOut}>
+            <LogOut className="mr-1 h-4 w-4" /> Sign out
+          </Button>
+        </nav>
       </div>
     </header>
   );
