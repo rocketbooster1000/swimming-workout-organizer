@@ -331,7 +331,7 @@ function WorkoutBuilder() {
               <GroupRow
                 key={item.id}
                 group={item}
-                unit={draft.pool_unit}
+                unit={displayUnit}
                 onChangeGroup={(p) => updateItem(item.id, p)}
                 onRemove={() => removeItem(item.id)}
                 onMove={(dir) => moveItem(item.id, dir)}
