@@ -263,14 +263,21 @@ function WorkoutBuilder() {
 
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
           <div>
-            <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Pool length</Label>
+            <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Course</Label>
             <div className="mt-1 flex gap-2">
               <Input type="number" min={10} value={draft.pool_length} onChange={(e) => update("pool_length", parseInt(e.target.value) || 25)} className="w-20" />
-              <Select value={draft.pool_unit} onValueChange={(v) => update("pool_unit", v)}>
-                <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+              <Select
+                value={draft.pool_unit}
+                onValueChange={(v) => {
+                  update("pool_unit", v);
+                  update("pool_length", courseLength(v));
+                }}
+              >
+                <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="yd">yards</SelectItem>
-                  <SelectItem value="m">meters</SelectItem>
+                  <SelectItem value="scy">SCY</SelectItem>
+                  <SelectItem value="lcm">LCM</SelectItem>
+                  <SelectItem value="scm">SCM</SelectItem>
                 </SelectContent>
               </Select>
             </div>
