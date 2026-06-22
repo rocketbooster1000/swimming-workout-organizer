@@ -11,6 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import {
   STROKES,
+  courseLength,
+  courseUnit,
   describeSet,
   formatDuration,
   formatInterval,
