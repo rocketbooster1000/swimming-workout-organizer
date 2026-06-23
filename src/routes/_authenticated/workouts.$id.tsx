@@ -264,8 +264,7 @@ function WorkoutBuilder() {
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
           <div>
             <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Course</Label>
-            <div className="mt-1 flex gap-2">
-              <Input type="number" min={10} value={draft.pool_length} onChange={(e) => update("pool_length", parseInt(e.target.value) || 25)} className="w-20" />
+            <div className="mt-1">
               <Select
                 value={draft.pool_unit}
                 onValueChange={(v) => {
