@@ -1,6 +1,5 @@
 import jsPDF from "jspdf";
 import {
-  formatInterval,
   isGroup,
   isRest,
   itemDistance,
@@ -44,14 +43,10 @@ function renderItem(item: SectionItem, indent: number, lines: string[]) {
   );
 }
 
-export function buildWorkoutLines(workout: Workout): string[] {
+export function buildWorkoutLines(workout: Workout, forceHours: boolean): string[] {
   const lines: string[] = [];
   let cumDist = 0;
   let cumSec = 0;
-  // Decide whether any cumulative time crosses an hour — if so, force H:MM:SS for all
-  // time/cumulative-time lines for visual consistency. Intervals stay compact.
-  const grandSec = workout.sets.reduce((a, c) => a + itemSeconds(c), 0);
-  const forceH = grandSec >= 3600;
   for (const item of workout.sets) {
     const block: string[] = [];
     renderItem(item, 0, block);
@@ -62,7 +57,7 @@ export function buildWorkoutLines(workout: Workout): string[] {
     for (const l of block) lines.push(l);
     lines.push("");
     lines.push(
-      `Distance: ${d}/${cumDist} | Time: ${fmtTime(t, forceH)}/${fmtTime(cumSec, forceH)}`,
+      `Distance: ${d}/${cumDist} | Time: ${fmtTime(t, forceHours)}/${fmtTime(cumSec, forceHours)}`,
     );
     lines.push("");
   }
@@ -106,7 +101,7 @@ export function downloadWorkoutPdf(workout: Workout) {
     workout.pool_unit ? `Course: ${workout.pool_unit.toUpperCase()}` : null,
   ]
     .filter(Boolean)
-    .join("   •   ");
+    .join("   \u2022   ");
   if (meta) {
     doc.text(meta, marginX, y);
     y += 18;
@@ -115,37 +110,9 @@ export function downloadWorkoutPdf(workout: Workout) {
   doc.setFont("times", "normal");
   doc.setFontSize(12);
 
-export function downloadWorkoutPdf(workout: Workout) {
-  const doc = new jsPDF({ unit: "pt", format: "letter" });
-  const marginX = 54;
-  let y = 64;
-  const lineHeight = 14;
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const maxWidth = pageWidth - marginX * 2;
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(16);
-  doc.text(workout.title || "Workout", marginX, y);
-  y += 22;
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-  const meta = [
-    workout.focus ? `Focus: ${workout.focus}` : null,
-    workout.pool_unit ? `Course: ${workout.pool_unit.toUpperCase()}` : null,
-  ]
-    .filter(Boolean)
-    .join("  •  ");
-  if (meta) {
-    doc.text(meta, marginX, y);
-    y += 18;
-  }
-
-  doc.setFont("courier", "normal");
-  doc.setFontSize(11);
-
-  const lines = buildWorkoutLines(workout);
+  const grandSec = workout.sets.reduce((a, c) => a + itemSeconds(c), 0);
+  const forceH = grandSec >= 3600;
+  const lines = buildWorkoutLines(workout, forceH);
   for (const raw of lines) {
     const wrapped = doc.splitTextToSize(raw === "" ? " " : raw, maxWidth);
     for (const w of wrapped) {
@@ -161,6 +128,3 @@ export function downloadWorkoutPdf(workout: Workout) {
   const safe = (workout.title || "workout").replace(/[^a-z0-9-_]+/gi, "_").toLowerCase();
   doc.save(`${safe}.pdf`);
 }
-
-// keep formatInterval reachable for potential future use
-void formatInterval;
