@@ -61,6 +61,20 @@ function Dashboard() {
     toast.success("Workout deleted");
   }
 
+  async function renameWorkout(id: string, currentTitle: string) {
+    const next = window.prompt("Rename practice", currentTitle);
+    if (next === null) return;
+    const title = next.trim();
+    if (!title || title === currentTitle) return;
+    const { error } = await supabase.from("workouts").update({ title }).eq("id", id);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    qc.invalidateQueries({ queryKey: ["workouts"] });
+    toast.success("Renamed");
+  }
+
   return (
     <main className="mx-auto max-w-6xl px-6 py-10">
       <div className="flex items-end justify-between">
@@ -99,10 +113,10 @@ function Dashboard() {
                 {w.focus && <div className="mt-0.5 text-xs uppercase tracking-wider text-muted-foreground">{w.focus}</div>}
               </div>
               <div className="flex gap-1 opacity-0 transition group-hover:opacity-100">
-                <Link to="/workouts/$id" params={{ id: w.id }}>
-                  <Button size="icon" variant="ghost"><Pencil className="h-3.5 w-3.5" /></Button>
-                </Link>
-                <Button size="icon" variant="ghost" onClick={() => deleteWorkout(w.id)}>
+                <Button size="icon" variant="ghost" title="Rename" onClick={() => renameWorkout(w.id, w.title)}>
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+                <Button size="icon" variant="ghost" title="Delete" onClick={() => deleteWorkout(w.id)}>
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
