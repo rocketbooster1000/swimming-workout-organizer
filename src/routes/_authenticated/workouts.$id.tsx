@@ -34,6 +34,7 @@ import {
   type Workout,
   type WorkoutSet,
 } from "@/lib/workout";
+import { downloadWorkoutPdf } from "@/lib/workout-pdf";
 
 export const Route = createFileRoute("/_authenticated/workouts/$id")({
   head: () => ({ meta: [{ title: "Edit workout — Lanes" }] }),
@@ -212,7 +213,7 @@ function WorkoutBuilder() {
           <ArrowLeft className="h-4 w-4" /> All workouts
         </Link>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => window.print()}>
+          <Button variant="outline" onClick={() => draft && downloadWorkoutPdf(draft)}>
             <Printer className="mr-1 h-4 w-4" /> Print
           </Button>
           <Button onClick={save} disabled={saving || !dirty}>
