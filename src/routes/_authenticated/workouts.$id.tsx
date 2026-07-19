@@ -2,7 +2,6 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, GripVertical, Hourglass, Layers, Plus, Printer, Save, Trash2, Waves } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,9 +34,10 @@ import {
   type WorkoutSet,
 } from "@/lib/workout";
 import { downloadWorkoutPdf } from "@/lib/workout-pdf";
+import { getCurrentProfile, getLocalWorkout, updateLocalWorkout } from "@/lib/local-store";
 
 export const Route = createFileRoute("/_authenticated/workouts/$id")({
-  head: () => ({ meta: [{ title: "Edit workout — Lanes" }] }),
+  head: () => ({ meta: [{ title: "Edit workout - Lanes" }] }),
   component: WorkoutBuilder,
 });
 
@@ -57,14 +57,12 @@ function normalizeItems(raw: unknown): SectionItem[] {
 function WorkoutBuilder() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
+  const profile = getCurrentProfile();
 
   const { data: workout, isLoading } = useQuery({
-    queryKey: ["workout", id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("workouts").select("*").eq("id", id).maybeSingle();
-      if (error) throw error;
-      return data as unknown as Workout | null;
-    },
+    queryKey: ["workout", id, profile?.id],
+    queryFn: async () => (profile ? getLocalWorkout(profile.id, id) : null),
+    enabled: !!profile,
   });
 
   const [draft, setDraft] = useState<Workout | null>(null);
@@ -90,7 +88,6 @@ function WorkoutBuilder() {
     setDirty(true);
   }
 
-  // Recursive tree helpers — operate on any item by id, at any nesting depth.
   function mapTree(items: SectionItem[], fn: (it: SectionItem) => SectionItem | null): SectionItem[] {
     const out: SectionItem[] = [];
     for (const it of items) {
@@ -106,16 +103,13 @@ function WorkoutBuilder() {
   }
 
   function updateItem(itemId: string, patch: Partial<SectionItem>) {
-    mutateItems((items) =>
-      mapTree(items, (it) => (it.id === itemId ? ({ ...it, ...patch } as SectionItem) : it)),
-    );
+    mutateItems((items) => mapTree(items, (it) => (it.id === itemId ? ({ ...it, ...patch } as SectionItem) : it)));
   }
 
   function removeItem(itemId: string) {
     mutateItems((items) => mapTree(items, (it) => (it.id === itemId ? null : it)));
   }
 
-  // Move within whatever sibling list contains the item.
   function moveItem(itemId: string, dir: -1 | 1) {
     function walk(items: SectionItem[]): SectionItem[] {
       const idx = items.findIndex((s) => s.id === itemId);
@@ -145,65 +139,50 @@ function WorkoutBuilder() {
 
   function addChildSet(groupId: string) {
     mutateItems((items) =>
-      mapTree(items, (it) =>
-        it.id === groupId && isGroup(it)
-          ? { ...it, children: [...it.children, newChildSet()] }
-          : it,
-      ),
+      mapTree(items, (it) => (it.id === groupId && isGroup(it) ? { ...it, children: [...it.children, newChildSet()] } : it)),
     );
   }
 
   function addChildGroup(groupId: string) {
     mutateItems((items) =>
-      mapTree(items, (it) =>
-        it.id === groupId && isGroup(it)
-          ? { ...it, children: [...it.children, newGroup()] }
-          : it,
-      ),
+      mapTree(items, (it) => (it.id === groupId && isGroup(it) ? { ...it, children: [...it.children, newGroup()] } : it)),
     );
   }
 
   function addChildRest(groupId: string) {
     mutateItems((items) =>
-      mapTree(items, (it) =>
-        it.id === groupId && isGroup(it)
-          ? { ...it, children: [...it.children, newRest()] }
-          : it,
-      ),
+      mapTree(items, (it) => (it.id === groupId && isGroup(it) ? { ...it, children: [...it.children, newRest()] } : it)),
     );
   }
 
-
   async function save() {
-    if (!draft) return;
+    if (!draft || !profile) return;
     setSaving(true);
     const t = totals(draft.sets);
-    const { error } = await supabase
-      .from("workouts")
-      .update({
+    try {
+      updateLocalWorkout(profile.id, draft.id, {
         title: draft.title,
         focus: draft.focus,
         level: draft.level,
         pool_length: draft.pool_length,
         pool_unit: draft.pool_unit,
         notes: draft.notes,
-        sets: draft.sets as unknown as never,
+        sets: draft.sets,
         total_distance: t.distance,
         total_seconds: t.seconds,
         scheduled_for: draft.scheduled_for,
-      })
-      .eq("id", draft.id);
-    setSaving(false);
-    if (error) {
-      toast.error(error.message);
-      return;
+      });
+      setDirty(false);
+      toast.success("Saved");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSaving(false);
     }
-    setDirty(false);
-    toast.success("Saved");
   }
 
   if (isLoading || !draft) {
-    return <div className="mx-auto max-w-5xl px-6 py-10 text-sm text-muted-foreground">Loading…</div>;
+    return <div className="mx-auto max-w-5xl px-6 py-10 text-sm text-muted-foreground">Loading...</div>;
   }
 
   return (
@@ -217,12 +196,11 @@ function WorkoutBuilder() {
             <Printer className="mr-1 h-4 w-4" /> Print
           </Button>
           <Button onClick={save} disabled={saving || !dirty}>
-            <Save className="mr-1 h-4 w-4" /> {saving ? "Saving…" : dirty ? "Save" : "Saved"}
+            <Save className="mr-1 h-4 w-4" /> {saving ? "Saving..." : dirty ? "Save" : "Saved"}
           </Button>
         </div>
       </div>
 
-      {/* Header card */}
       <div className="ripple-card rounded-2xl p-6">
         <div className="flex flex-wrap items-start gap-4">
           <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground">
@@ -273,7 +251,9 @@ function WorkoutBuilder() {
                   update("pool_length", courseLength(v));
                 }}
               >
-                <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-28">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="scy">SCY</SelectItem>
                   <SelectItem value="lcm">LCM</SelectItem>
@@ -285,7 +265,9 @@ function WorkoutBuilder() {
           <div>
             <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Level</Label>
             <Select value={draft.level} onValueChange={(v) => update("level", v)}>
-              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="mt-1">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="novice">Novice</SelectItem>
                 <SelectItem value="age-group">Age group</SelectItem>
@@ -303,7 +285,6 @@ function WorkoutBuilder() {
         </div>
       </div>
 
-      {/* Sets */}
       <div className="mt-6 space-y-6">
         <div className="flex items-center justify-between">
           <h2 className="font-display text-xl font-semibold text-deep">Sets</h2>
@@ -323,7 +304,7 @@ function WorkoutBuilder() {
         <div className="mt-4 space-y-3">
           {draft.sets.length === 0 && (
             <div className="rounded-lg border border-dashed border-border/60 bg-card/50 p-6 text-center text-xs text-muted-foreground">
-              No sets yet — add a block.
+              No sets yet - add a block.
             </div>
           )}
           {draft.sets.map((item) =>
@@ -364,13 +345,12 @@ function WorkoutBuilder() {
         </div>
       </div>
 
-
       <div className="mt-8 print:hidden">
         <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Practice notes</Label>
         <Textarea
           value={draft.notes ?? ""}
           onChange={(e) => update("notes", e.target.value)}
-          placeholder="Anything else for the deck — equipment list, target heart-rate, send-offs."
+          placeholder="Anything else for the deck - equipment list, target heart-rate, send-offs."
           rows={4}
           className="mt-1"
         />
@@ -394,7 +374,6 @@ function GroupRow({
 }: {
   group: SetGroup;
   unit: string;
-  
   onChangeGroup: (p: Partial<SetGroup>) => void;
   onRemove: () => void;
   onMove: (dir: -1 | 1) => void;
@@ -411,29 +390,26 @@ function GroupRow({
     <div className="rounded-lg border-2 border-primary/30 bg-foam/40 p-3">
       <div className="flex flex-wrap items-end gap-2">
         <div className="flex flex-col items-center gap-1 print:hidden">
-          <button onClick={() => onMove(-1)} className="text-xs text-muted-foreground hover:text-deep">▲</button>
+          <button onClick={() => onMove(-1)} className="text-xs text-muted-foreground hover:text-deep">
+            ▲
+          </button>
           <Layers className="h-4 w-4 text-primary/70" />
-          <button onClick={() => onMove(1)} className="text-xs text-muted-foreground hover:text-deep">▼</button>
+          <button onClick={() => onMove(1)} className="text-xs text-muted-foreground hover:text-deep">
+            ▼
+          </button>
         </div>
         <Field label="Rounds" w="w-20">
-          <Input
-            type="number"
-            min={1}
-            value={group.rounds}
-            onChange={(e) => onChangeGroup({ rounds: parseInt(e.target.value) || 1 })}
-          />
+          <Input type="number" min={1} value={group.rounds} onChange={(e) => onChangeGroup({ rounds: parseInt(e.target.value) || 1 })} />
         </Field>
         <span className="pb-2 text-muted-foreground">rounds of</span>
         <Field label="Group label (optional)" w="flex-1 min-w-48">
-          <Input
-            value={group.label ?? ""}
-            onChange={(e) => onChangeGroup({ label: e.target.value })}
-            placeholder="e.g. Stroke rotation"
-          />
+          <Input value={group.label ?? ""} onChange={(e) => onChangeGroup({ label: e.target.value })} placeholder="e.g. Stroke rotation" />
         </Field>
         <div className="ml-auto flex items-center gap-3">
           <div className="text-right">
-            <div className="font-display text-base font-semibold tabular-nums text-deep">{dist.toLocaleString()} {unit}</div>
+            <div className="font-display text-base font-semibold tabular-nums text-deep">
+              {dist.toLocaleString()} {unit}
+            </div>
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{formatDuration(secs) || "—"}</div>
           </div>
           <Button size="icon" variant="ghost" onClick={onRemove} className="print:hidden">
@@ -497,14 +473,10 @@ function GroupRow({
       </div>
 
       <div className="mt-1 hidden text-xs font-medium text-deep print:block">
-        {group.rounds} rounds of{group.label ? ` — ${group.label}` : ""}:{" "}
+        {group.rounds} rounds of{group.label ? ` - ${group.label}` : ""}:{" "}
         {group.children
           .map((c) =>
-            isGroup(c)
-              ? `[${c.rounds}× …]`
-              : isRest(c)
-                ? `rest ${c.seconds}s`
-                : describeSet(c),
+            isGroup(c) ? `[${c.rounds}x ...]` : isRest(c) ? `rest ${c.seconds}s` : describeSet(c),
           )
           .join("; ")}
       </div>
@@ -532,22 +504,32 @@ function SetRow({
     <div className="rounded-lg border border-border/60 bg-card/80 p-3">
       <div className="flex flex-wrap items-end gap-2">
         <div className="flex flex-col items-center gap-1 print:hidden">
-          <button onClick={() => onMove(-1)} className="text-xs text-muted-foreground hover:text-deep">▲</button>
+          <button onClick={() => onMove(-1)} className="text-xs text-muted-foreground hover:text-deep">
+            ▲
+          </button>
           <GripVertical className="h-4 w-4 text-muted-foreground/60" />
-          <button onClick={() => onMove(1)} className="text-xs text-muted-foreground hover:text-deep">▼</button>
+          <button onClick={() => onMove(1)} className="text-xs text-muted-foreground hover:text-deep">
+            ▼
+          </button>
         </div>
         <Field label="Reps" w="w-16">
           <Input type="number" min={1} value={set.reps} onChange={(e) => onChange({ reps: parseInt(e.target.value) || 1 })} />
         </Field>
-        <span className="pb-2 text-muted-foreground">×</span>
+        <span className="pb-2 text-muted-foreground">x</span>
         <Field label={`Dist (${unit})`} w="w-20">
           <Input type="number" min={0} step={25} value={set.distance} onChange={(e) => onChange({ distance: parseInt(e.target.value) || 0 })} />
         </Field>
         <Field label="Stroke" w="w-32">
           <Select value={set.stroke} onValueChange={(v) => onChange({ stroke: v })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
-              {STROKES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              {STROKES.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {s}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </Field>
@@ -564,9 +546,7 @@ function SetRow({
             <div className="font-display text-base font-semibold tabular-nums text-deep">
               {setDistance(set).toLocaleString()} {unit}
             </div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-              {formatDuration(setSeconds(set)) || "—"}
-            </div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{formatDuration(setSeconds(set)) || "—"}</div>
           </div>
           <Button size="icon" variant="ghost" onClick={onRemove} className="print:hidden">
             <Trash2 className="h-3.5 w-3.5" />
@@ -607,9 +587,13 @@ function RestRow({
     <div className="rounded-lg border border-dashed border-primary/40 bg-foam/30 p-3">
       <div className="flex flex-wrap items-end gap-2">
         <div className="flex flex-col items-center gap-1 print:hidden">
-          <button onClick={() => onMove(-1)} className="text-xs text-muted-foreground hover:text-deep">▲</button>
+          <button onClick={() => onMove(-1)} className="text-xs text-muted-foreground hover:text-deep">
+            ▲
+          </button>
           <Hourglass className="h-4 w-4 text-primary/70" />
-          <button onClick={() => onMove(1)} className="text-xs text-muted-foreground hover:text-deep">▼</button>
+          <button onClick={() => onMove(1)} className="text-xs text-muted-foreground hover:text-deep">
+            ▼
+          </button>
         </div>
         <Field label="Rest (s)" w="w-24">
           <Input
@@ -637,7 +621,7 @@ function RestRow({
         </div>
       </div>
       <div className="mt-1 hidden text-xs font-medium text-deep print:block">
-        Rest {rest.seconds}s{rest.label ? ` — ${rest.label}` : ""}
+        Rest {rest.seconds}s{rest.label ? ` - ${rest.label}` : ""}
       </div>
     </div>
   );

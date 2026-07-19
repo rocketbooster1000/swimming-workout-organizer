@@ -6,10 +6,10 @@ import { Button } from "@/components/ui/button";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Lanes — Build swim workouts your squad will actually finish" },
-      { name: "description", content: "A coach-built workout planner for swimming. Compose sets, auto-total yardage and intervals, save and share with your team." },
-      { property: "og:title", content: "Lanes — Swim workout builder for coaches" },
-      { property: "og:description", content: "Compose sets, auto-total yardage and intervals, save workouts for your squad." },
+      { title: "Lanes - Offline swim workouts on your device" },
+      { name: "description", content: "A local-only workout planner for swimming. Create profiles, compose sets, and keep practices stored on this device." },
+      { property: "og:title", content: "Lanes - Offline swim workouts" },
+      { property: "og:description", content: "Create local profiles, compose sets, and keep workouts on this device." },
     ],
   }),
   component: Landing,
@@ -27,10 +27,10 @@ function Landing() {
         </Link>
         <nav className="flex items-center gap-2">
           <Link to="/auth">
-            <Button variant="ghost">Sign in</Button>
+            <Button variant="ghost">Open profiles</Button>
           </Link>
-          <Link to="/auth" search={{ mode: "signup" }}>
-            <Button>Get started</Button>
+          <Link to="/auth">
+            <Button>Create profile</Button>
           </Link>
         </nav>
       </header>
@@ -45,20 +45,20 @@ function Landing() {
             <span className="text-primary">add up.</span>
           </h1>
           <p className="mt-5 max-w-md text-lg text-muted-foreground">
-            Drop in sets, pick a stroke, set the interval. Lanes auto-totals yardage and time so you can write practice in the parking lot — not the night before.
+            Drop in sets, pick a stroke, set the interval. Lanes auto-totals yardage and time so you can build practice anywhere, even without a network connection.
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
-            <Link to="/auth" search={{ mode: "signup" }}>
-              <Button size="lg">Start building free</Button>
+            <Link to="/auth">
+              <Button size="lg">Create profile</Button>
             </Link>
             <Link to="/auth">
-              <Button size="lg" variant="outline">I have an account</Button>
+              <Button size="lg" variant="outline">Open profiles</Button>
             </Link>
           </div>
           <div className="mt-10 grid max-w-md gap-4 sm:grid-cols-3">
             <Feature icon={ClipboardList} label="Warm-up · Main · Cool-down" />
             <Feature icon={Timer} label="Live yardage + time" />
-            <Feature icon={Share2} label="Saved per coach" />
+            <Feature icon={Share2} label="Saved per profile" />
           </div>
         </div>
 

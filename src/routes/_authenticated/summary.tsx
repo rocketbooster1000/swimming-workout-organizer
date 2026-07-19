@@ -2,14 +2,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Ruler, Timer, CalendarDays } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatDuration, type Workout } from "@/lib/workout";
+import { getCurrentProfile, getLocalWorkouts } from "@/lib/local-store";
 
 export const Route = createFileRoute("/_authenticated/summary")({
-  head: () => ({ meta: [{ title: "Summary — Lanes" }] }),
+  head: () => ({ meta: [{ title: "Summary - Lanes" }] }),
   component: SummaryPage,
 });
 
@@ -26,7 +26,7 @@ function ymd(d: Date) {
 function startOfWeek(d: Date) {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
-  const day = x.getDay(); // 0=Sun
+  const day = x.getDay();
   x.setDate(x.getDate() - day);
   return x;
 }
@@ -38,7 +38,6 @@ function addDays(d: Date, n: number) {
 }
 
 function seasonRange(course: "scy" | "lcm", year: number): [Date, Date] {
-  // SCY: Aug (year) - Mar (year+1). LCM: Apr (year) - Jul (year)
   if (course === "scy") {
     return [new Date(year, 7, 1), new Date(year + 1, 2, 31, 23, 59, 59)];
   }
@@ -46,32 +45,23 @@ function seasonRange(course: "scy" | "lcm", year: number): [Date, Date] {
 }
 
 function SummaryPage() {
+  const profile = getCurrentProfile();
   const [mode, setMode] = useState<Mode>("week");
 
   const { data, isLoading } = useQuery({
-    queryKey: ["workouts", "summary"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("workouts")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as unknown as Workout[];
-    },
+    queryKey: ["workouts", "summary", profile?.id],
+    queryFn: async () => (profile ? getLocalWorkouts(profile.id) : []),
+    enabled: !!profile,
   });
 
   const workouts = data ?? [];
 
-  // Week mode
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()));
-  // Year mode
   const thisYear = new Date().getFullYear();
   const [yearStart, setYearStart] = useState(thisYear);
   const [yearEnd, setYearEnd] = useState(thisYear);
-  // Date mode
   const [dateStart, setDateStart] = useState(ymd(addDays(new Date(), -30)));
   const [dateEnd, setDateEnd] = useState(ymd(new Date()));
-  // Season
   const [seasonCourse, setSeasonCourse] = useState<"scy" | "lcm">("scy");
   const [seasonYear, setSeasonYear] = useState(thisYear);
 
@@ -132,7 +122,7 @@ function SummaryPage() {
               <div className="text-xs uppercase tracking-wider text-muted-foreground">Week of</div>
               <div className="font-display text-lg font-semibold text-deep">
                 {weekStart.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
-                {" – "}
+                {" - "}
                 {addDays(weekStart, 6).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
               </div>
             </div>
@@ -188,7 +178,7 @@ function SummaryPage() {
               <Input type="number" value={seasonYear} onChange={(e) => setSeasonYear(parseInt(e.target.value) || thisYear)} />
             </div>
             <div className="sm:col-span-2 text-xs text-muted-foreground">
-              {seasonCourse === "scy" ? "SCY season: Aug " + seasonYear + " – Mar " + (seasonYear + 1) : "LCM season: Apr – Jul " + seasonYear}
+              {seasonCourse === "scy" ? "SCY season: Aug " + seasonYear + " - Mar " + (seasonYear + 1) : "LCM season: Apr - Jul " + seasonYear}
             </div>
           </div>
         )}
@@ -203,7 +193,7 @@ function SummaryPage() {
               ? "0"
               : Object.entries(totals.byUnit)
                   .map(([u, v]) => `${v.toLocaleString()} ${u}`)
-                  .join(" · ")
+                  .join(" - ")
           }
         />
         <StatCard icon={Timer} label="Total time" value={formatDuration(totals.seconds)} />
@@ -215,7 +205,7 @@ function SummaryPage() {
           Workouts in range
         </div>
         {isLoading ? (
-          <div className="p-5 text-sm text-muted-foreground">Loading…</div>
+          <div className="p-5 text-sm text-muted-foreground">Loading...</div>
         ) : filtered.length === 0 ? (
           <div className="p-5 text-sm text-muted-foreground">No workouts in this window.</div>
         ) : (
@@ -225,11 +215,13 @@ function SummaryPage() {
                 <div className="min-w-0">
                   <div className="truncate font-medium text-deep">{w.title}</div>
                   <div className="text-xs text-muted-foreground">
-                    {workoutDate(w).toLocaleDateString()} · {w.pool_unit.toUpperCase()}
+                    {workoutDate(w).toLocaleDateString()} - {w.pool_unit.toUpperCase()}
                   </div>
                 </div>
                 <div className="flex shrink-0 gap-4 text-sm text-muted-foreground">
-                  <span>{(w.total_distance ?? 0).toLocaleString()} {w.pool_unit === "scy" ? "yd" : "m"}</span>
+                  <span>
+                    {(w.total_distance ?? 0).toLocaleString()} {w.pool_unit === "scy" ? "yd" : "m"}
+                  </span>
                   <span>{formatDuration(w.total_seconds ?? 0)}</span>
                 </div>
               </li>

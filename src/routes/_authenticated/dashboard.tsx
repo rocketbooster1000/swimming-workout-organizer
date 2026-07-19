@@ -1,78 +1,61 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Plus, CalendarDays, Ruler, Timer, Pencil, Trash2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { formatDuration, type Workout } from "@/lib/workout";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
+import {
+  createLocalWorkout,
+  deleteLocalWorkout,
+  getCurrentProfile,
+  getLocalWorkouts,
+  updateLocalWorkout,
+} from "@/lib/local-store";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
-  head: () => ({ meta: [{ title: "Workouts — Lanes" }] }),
+  head: () => ({ meta: [{ title: "Workouts - Lanes" }] }),
   component: Dashboard,
 });
 
 function Dashboard() {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const profile = getCurrentProfile();
+
   const { data, isLoading } = useQuery({
-    queryKey: ["workouts"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("workouts")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as unknown as Workout[];
-    },
+    queryKey: ["workouts", profile?.id],
+    queryFn: async () => (profile ? getLocalWorkouts(profile.id) : []),
+    enabled: !!profile,
   });
 
   async function createWorkout() {
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return;
-    const { data, error } = await supabase
-      .from("workouts")
-      .insert({
-        user_id: u.user.id,
-        title: "Untitled practice",
-        focus: "Aerobic",
-        level: "intermediate",
-        pool_length: 25,
-        pool_unit: "scy",
-        sets: [],
-      })
-      .select()
-      .single();
-    if (error || !data) {
-      toast.error(error?.message ?? "Failed to create");
-      return;
-    }
-    navigate({ to: "/workouts/$id", params: { id: data.id } });
+    if (!profile) return;
+    const workout = createLocalWorkout(profile.id);
+    navigate({ to: "/workouts/$id", params: { id: workout.id } });
   }
 
   async function deleteWorkout(id: string) {
+    if (!profile) return;
     if (!confirm("Delete this workout?")) return;
-    const { error } = await supabase.from("workouts").delete().eq("id", id);
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-    qc.invalidateQueries({ queryKey: ["workouts"] });
+    deleteLocalWorkout(profile.id, id);
+    qc.invalidateQueries({ queryKey: ["workouts", profile.id] });
     toast.success("Workout deleted");
   }
 
   async function renameWorkout(id: string, currentTitle: string) {
+    if (!profile) return;
     const next = window.prompt("Rename practice", currentTitle);
     if (next === null) return;
     const title = next.trim();
     if (!title || title === currentTitle) return;
-    const { error } = await supabase.from("workouts").update({ title }).eq("id", id);
-    if (error) {
-      toast.error(error.message);
-      return;
+    try {
+      updateLocalWorkout(profile.id, id, { title });
+      qc.invalidateQueries({ queryKey: ["workouts", profile.id] });
+      toast.success("Renamed");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to rename");
     }
-    qc.invalidateQueries({ queryKey: ["workouts"] });
-    toast.success("Renamed");
   }
 
   return (
@@ -80,7 +63,7 @@ function Dashboard() {
       <div className="flex items-end justify-between">
         <div>
           <h1 className="font-display text-3xl font-semibold text-deep">Your workouts</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Saved practices for your squad.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Saved practices on this device.</p>
         </div>
         <Button onClick={createWorkout}>
           <Plus className="mr-1 h-4 w-4" /> New workout
@@ -90,7 +73,7 @@ function Dashboard() {
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {isLoading && (
           <div className="col-span-full rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-            Loading…
+            Loading...
           </div>
         )}
         {!isLoading && (data?.length ?? 0) === 0 && (
@@ -98,9 +81,13 @@ function Dashboard() {
             onClick={createWorkout}
             className="ripple-card col-span-full flex flex-col items-center gap-2 rounded-xl border-2 border-dashed border-primary/30 p-12 text-center transition hover:border-primary"
           >
-            <span className="grid h-12 w-12 place-items-center rounded-full bg-primary/10 text-primary"><Plus className="h-5 w-5" /></span>
+            <span className="grid h-12 w-12 place-items-center rounded-full bg-primary/10 text-primary">
+              <Plus className="h-5 w-5" />
+            </span>
             <div className="font-display text-lg font-semibold text-deep">Write your first practice</div>
-            <div className="text-sm text-muted-foreground">Warm-up, main set, cool-down — drop it in and we'll do the math.</div>
+            <div className="text-sm text-muted-foreground">
+              Warm-up, main set, cool-down - drop it in and we&apos;ll do the math.
+            </div>
           </button>
         )}
         {data?.map((w) => (

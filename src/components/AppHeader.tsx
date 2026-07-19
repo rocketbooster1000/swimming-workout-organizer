@@ -1,8 +1,8 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { LogOut, Waves, BarChart3, ListChecks } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useQueryClient } from "@tanstack/react-query";
+import { getCurrentProfile, signOutLocal } from "@/lib/local-store";
 
 export function AppHeader() {
   const navigate = useNavigate();
@@ -11,7 +11,7 @@ export function AppHeader() {
   async function signOut() {
     await qc.cancelQueries();
     qc.clear();
-    await supabase.auth.signOut();
+    signOutLocal();
     navigate({ to: "/auth", replace: true });
   }
 
@@ -25,11 +25,18 @@ export function AppHeader() {
           Lanes
         </Link>
         <nav className="flex items-center gap-1">
+          <div className="hidden rounded-md border border-border bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground sm:block">
+            {getCurrentProfile()?.display_name ?? "Profile"}
+          </div>
           <Link to="/dashboard">
-            <Button variant="ghost" size="sm"><ListChecks className="mr-1 h-4 w-4" /> Workouts</Button>
+            <Button variant="ghost" size="sm">
+              <ListChecks className="mr-1 h-4 w-4" /> Workouts
+            </Button>
           </Link>
           <Link to="/summary">
-            <Button variant="ghost" size="sm"><BarChart3 className="mr-1 h-4 w-4" /> Summary</Button>
+            <Button variant="ghost" size="sm">
+              <BarChart3 className="mr-1 h-4 w-4" /> Summary
+            </Button>
           </Link>
           <Button variant="ghost" size="sm" onClick={signOut}>
             <LogOut className="mr-1 h-4 w-4" /> Sign out

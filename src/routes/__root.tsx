@@ -9,10 +9,10 @@ import {
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 import { Toaster } from "@/components/ui/sonner";
-import { supabase } from "@/integrations/supabase/client";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { LOCAL_STORE_EVENT } from "@/lib/local-store";
 
 function NotFoundComponent() {
   return (
@@ -89,17 +89,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:site", content: "@Lovable" },
       { name: "twitter:title", content: "Swimming Workout Organizer by Lanes" },
       { name: "twitter:description", content: "Swim Plan Studio is a web tool for creating and managing custom swimming workouts." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/4ebdc7d8-fa6f-4775-92c1-9ff03547d02e/id-preview-68284153--729040a2-137f-42cd-8bfd-263a89b04e05.lovable.app-1782093132134.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/4ebdc7d8-fa6f-4775-92c1-9ff03547d02e/id-preview-68284153--729040a2-137f-42cd-8bfd-263a89b04e05.lovable.app-1782093132134.png" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap",
-      },
     ],
   }),
   shellComponent: RootShell,
@@ -127,12 +119,17 @@ function RootComponent() {
   const router = useRouter();
 
   useEffect(() => {
-    const { data } = supabase.auth.onAuthStateChange((event) => {
-      if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
+    const handleLocalChange = () => {
       router.invalidate();
-      if (event !== "SIGNED_OUT") queryClient.invalidateQueries();
-    });
-    return () => data.subscription.unsubscribe();
+      queryClient.invalidateQueries();
+    };
+
+    window.addEventListener(LOCAL_STORE_EVENT, handleLocalChange);
+    window.addEventListener("storage", handleLocalChange);
+    return () => {
+      window.removeEventListener(LOCAL_STORE_EVENT, handleLocalChange);
+      window.removeEventListener("storage", handleLocalChange);
+    };
   }, [router, queryClient]);
 
   return (
